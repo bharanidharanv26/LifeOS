@@ -10,7 +10,6 @@ import {
   ChevronRight,
   CircleHelp,
   FileText,
-  Layers3,
   Mail,
   MessageSquare,
   Moon,
@@ -24,6 +23,10 @@ import { api, emptySchema, jsonRequest } from './api';
 import { applyTheme, notifyError, usePreferences, useWorkspace, type View } from './store';
 import { PlanCard } from './components/PlanCard';
 import { MemoryPanel } from './components/MemoryPanel';
+import { CalendarView } from './components/CalendarView';
+import { NotesView } from './components/NotesView';
+import { DraftsView } from './components/DraftsView';
+import { AuditView } from './components/AuditView';
 
 const navigation = [
   { name: 'Sessions', icon: MessageSquare },
@@ -211,12 +214,26 @@ export default function App() {
                     ? 'Make room for what matters.'
                     : state.view === 'Memory'
                       ? 'Your context, in your control.'
-                      : state.view}
+                      : state.view === 'Calendar'
+                        ? 'Your week, protected.'
+                        : state.view === 'Notes'
+                          ? 'What you chose to keep.'
+                          : state.view === 'Drafts'
+                            ? 'Written your way.'
+                            : 'Nothing happens off the record.'}
                 </h1>
                 <p className="text-sm text-muted">
                   {state.view === 'Sessions'
                     ? 'Tell me the outcome. We’ll work out the steps together.'
-                    : 'Everything stays in your local workspace.'}
+                    : state.view === 'Calendar'
+                      ? 'Prep blocks created only after you approve them.'
+                      : state.view === 'Notes'
+                        ? 'Context you approved, searchable when you need it.'
+                        : state.view === 'Drafts'
+                          ? 'Local drafts shaped by the style you taught me.'
+                          : state.view === 'Audit'
+                            ? 'Every proposal, correction, and local action—traceable.'
+                            : 'Everything stays in your local workspace.'}
                 </p>
               </div>
               <span className="trust-indicator">
@@ -262,12 +279,14 @@ export default function App() {
 
             {state.view === 'Memory' ? (
               <MemoryPanel expanded />
-            ) : state.view !== 'Sessions' ? (
-              <div className="empty-state">
-                <Layers3 size={32} />
-                <h2>Your local {state.view.toLowerCase()}</h2>
-                <p>This view will display approved local tool results in Phase 4.</p>
-              </div>
+            ) : state.view === 'Calendar' ? (
+              <CalendarView />
+            ) : state.view === 'Notes' ? (
+              <NotesView />
+            ) : state.view === 'Drafts' ? (
+              <DraftsView />
+            ) : state.view === 'Audit' ? (
+              <AuditView />
             ) : (
               <div className="workspace-grid">
                 <section className="goal-panel" aria-labelledby="goal-title">
@@ -474,6 +493,7 @@ export default function App() {
                               className="button"
                               disabled={
                                 state.pending.length > 0 ||
+                                state.executing ||
                                 !plan.steps.some(
                                   (step) =>
                                     step.status === 'proposed' &&
@@ -489,10 +509,22 @@ export default function App() {
                             </button>
                             <button
                               className="button primary ml-auto"
-                              disabled
-                              title="Local execution is implemented in Phase 4"
+                              disabled={approved === 0 || state.executing}
+                              onClick={() => {
+                                void state.execute();
+                              }}
+                              title="Run approved local actions in this session"
                             >
-                              Run approved ({approved})<ArrowRight size={14} />
+                              {state.executing ? (
+                                <>
+                                  <span className="spinner" aria-hidden="true" />
+                                  Running…
+                                </>
+                              ) : (
+                                <>
+                                  Run approved ({approved})<ArrowRight size={14} />
+                                </>
+                              )}
                             </button>
                           </div>
                         </div>

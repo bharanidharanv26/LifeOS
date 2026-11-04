@@ -15,3 +15,11 @@
 - Sonner handles accessible error/undo notifications; Base UI is installed for upcoming accessible drawers and confirmation dialogs. Framer Motion fades occasional plan arrivals at 180ms; frequent review actions and keyboard actions remain immediate. Reduced motion and pointer gating are included.
 - The smallest Phase 1 extension is `restore(id)`: deletion undo restores the original identity, confidence, counters, and timeline from its recorded snapshot. A new HTTP integration test verifies this.
 - During this phase the execution button is explicitly disabled; Phase 4 wires it to local tools. Planning stages are shown as a workflow, not invented server progress percentages.
+
+## Phase 4
+
+- Execution re-checks the deterministic preference policy immediately before each local action, so a preference changed after approval still blocks the action. Each step runs in its own transaction: a failure is recorded on that step and does not roll back other completed local results.
+  +- Only `approved` and `edited` steps run. `executed` and `failed` steps never repeat. A session may run a second batch after more steps are approved.
+  +- Calendar blocks refuse to run when they overlap an existing local event (`CALENDAR_OVERLAP`). Duplicate creation is therefore impossible, and the conflicting block is named in the error.
+  +- Library APIs return the approving step, session, and originating goal so every calendar block, note, and draft can link back to its plan context.
+  +- Search notes is local-only and returns bounded excerpts. No email is sent, no external calendar is touched, and every result is labeled `simulated: true`.

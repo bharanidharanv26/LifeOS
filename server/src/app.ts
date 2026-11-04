@@ -12,6 +12,7 @@ import { memoriesRouter } from './routes/memories.js';
 import { createLlmClient } from './llm/client.js';
 import { AgentService } from './agent/service.js';
 import { sessionsRouter, stepsRouter } from './routes/sessions.js';
+import { auditRouter, calendarRouter, draftsRouter, notesRouter } from './routes/library.js';
 
 export interface AppDependencies {
   db: LifeDatabase;
@@ -75,6 +76,10 @@ export function createApp({
   app.use('/api/demo', demoRouter(db, clock));
   app.use('/api/sessions', sessionsRouter(agent));
   app.use('/api/steps', stepsRouter(agent));
+  app.use('/api/calendar', calendarRouter(db));
+  app.use('/api/notes', notesRouter(db));
+  app.use('/api/drafts', draftsRouter(db));
+  app.use('/api/audit', auditRouter(db));
   app.get('/api/llm-calls', (_request, response) =>
     response.json({
       calls: db.prepare('SELECT * FROM llm_calls ORDER BY rowid DESC LIMIT 100').all(),

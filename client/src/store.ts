@@ -8,6 +8,7 @@ import {
   jsonRequest,
   memoriesSchema,
   memorySchema,
+  executionSchema,
   sessionDetailSchema,
   sessionSummarySchema,
   stepSchema,
@@ -32,6 +33,8 @@ interface Workspace {
   view: View;
   loading: boolean;
   planning: boolean;
+  executing: boolean;
+  libraryVersion: number;
   pending: string[];
   selectedStepId: string | null;
   highlightedMemoryId: string | null;
@@ -40,6 +43,8 @@ interface Workspace {
   selectSession: (id: string) => Promise<void>;
   createPlan: (goal: string, demo?: boolean) => Promise<void>;
   review: (id: string, action: 'approve' | 'edit' | 'reject', body?: unknown) => Promise<boolean>;
+  execute: () => Promise<void>;
+  openStep: (sessionId: string, stepId: string) => Promise<void>;
   saveMemory: (id: string, value: string) => Promise<boolean>;
   removeMemory: (id: string) => Promise<void>;
   setView: (view: View) => void;
@@ -54,6 +59,8 @@ export const useWorkspace = create<Workspace>((set, get) => ({
   view: 'Sessions',
   loading: true,
   planning: false,
+  executing: false,
+  libraryVersion: 0,
   pending: [],
   selectedStepId: null,
   highlightedMemoryId: null,
@@ -138,6 +145,44 @@ export const useWorkspace = create<Workspace>((set, get) => ({
     } finally {
       set((state) => ({ pending: state.pending.filter((item) => item !== id) }));
     }
+  },
+  execute: async () => {
+    const active = get().active;
+    if (!active || get().executing) return;
+    set({ executing: true });
+    try {
+      const result = await api(
+        `/sessions/${active.session.id}/execute`,
+        executionSchema,
+        jsonRequest({}),
+      );
+      set({ active: result, libraryVersion: get().libraryVersion + 1 });
+      const sessions = await api(
+        '/sessions',
+        z.object({ sessions: z.array(sessionSummarySchema) }),
+      );
+      set({ sessions: sessions.sessions });
+      if (result.execution.failed > 0)
+        toast.warning(
+          `${result.execution.succeeded} local actions completed; ${result.execution.failed} failed.`,
+          { description: 'Failed steps show the reason inside the plan.' },
+        );
+      else
+        toast.success(`${result.execution.succeeded} local actions completed.`, {
+          description: 'Saved locally. Nothing was sent.',
+        });
+    } catch (error) {
+      notifyError(error);
+    } finally {
+      set({ executing: false });
+    }
+  },
+  openStep: async (sessionId, stepId) => {
+    await get().selectSession(sessionId);
+    set({ selectedStepId: stepId, view: 'Sessions' });
+    setTimeout(() => {
+      document.getElementById(`step-${stepId}`)?.scrollIntoView({ block: 'center' });
+    }, 80);
   },
   saveMemory: async (id, value) => {
     try {

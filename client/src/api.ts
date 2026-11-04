@@ -84,6 +84,59 @@ export const sessionDetailSchema = z.object({
   error: z.unknown(),
 });
 export type SessionDetail = z.infer<typeof sessionDetailSchema>;
+export const executionSchema = sessionDetailSchema.extend({
+  execution: z.object({
+    attempted: z.number(),
+    succeeded: z.number(),
+    failed: z.number(),
+    failures: z.array(z.object({ step_id: z.string(), code: z.string(), message: z.string() })),
+  }),
+});
+export const calendarEventSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  start: z.string(),
+  end: z.string(),
+  notes: z.string(),
+  step_id: z.string().nullable(),
+  session_id: z.string().nullable(),
+  session_goal: z.string().nullable(),
+});
+export const calendarSchema = z.object({ events: z.array(calendarEventSchema) });
+export type CalendarEvent = z.infer<typeof calendarEventSchema>;
+export const noteSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  body: z.string(),
+  tags: z.array(z.string()),
+  step_id: z.string().nullable(),
+  session_id: z.string().nullable(),
+  session_goal: z.string().nullable(),
+});
+export const notesSchema = z.object({ notes: z.array(noteSchema) });
+export type Note = z.infer<typeof noteSchema>;
+export const draftSchema = z.object({
+  id: z.string(),
+  to: z.string(),
+  subject: z.string(),
+  body: z.string(),
+  step_id: z.string().nullable(),
+  session_id: z.string().nullable(),
+  session_goal: z.string().nullable(),
+});
+export const draftsSchema = z.object({ drafts: z.array(draftSchema) });
+export type Draft = z.infer<typeof draftSchema>;
+export const auditEntrySchema = z.object({
+  id: z.string(),
+  ts: z.string(),
+  actor: z.enum(['user', 'agent', 'system']),
+  action: z.string(),
+  entity: z.string(),
+  entity_id: z.string(),
+  detail: z.unknown(),
+});
+export const auditSchema = z.object({ entries: z.array(auditEntrySchema) });
+export type AuditEntry = z.infer<typeof auditEntrySchema>;
 export const historySchema = z.object({
   events: z.array(
     z.object({ id: z.string(), event: z.string(), detail: z.string(), created_at: z.string() }),

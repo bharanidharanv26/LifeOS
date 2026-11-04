@@ -1,6 +1,6 @@
 # LifeOS phase gates
 
-Phases 1–2 are implemented. Every phase passes `npm run check` before the next begins.
+Phases 1–4 are implemented. Every phase passes `npm run check` before the next begins.
 
 ## Phase 1 — Foundation
 
@@ -40,15 +40,23 @@ Expected: every check passes; `http://localhost:5173` shows a connected database
 
 ## Phase 3 — Approval workspace
 
-- Sidebar, command bar, themes, and three-pane layout.
-- Plan cards with approve/edit/reject and memory citations.
-- Memory management panel and timelines.
+**Complete. Gate: `npm run check` passed; 45 tests.** `npm run demo` remains runnable.
+
+- [x] Sidebar, command bar, themes, and three-pane layout.
+- [x] Plan cards with approve/edit/reject and memory citations.
+- [x] Memory management panel and timelines.
+- [x] Deletion undo restores the original memory snapshot through `POST /api/memories/:id/restore`.
 
 ## Phase 4 — Local tools
 
-- Validated tool arguments, previews, and approval-gated execution.
-- Local drafts, overlap-aware calendar blocks, notes, and search.
-- Calendar/notes/drafts views and filterable audit timeline.
+**Complete. Gate: `npm run check` passed; 49 tests.** Commit follows this phase gate.
+
+- [x] Validated tool arguments, previews, and approval-gated execution.
+- [x] `POST /api/sessions/:id/execute` runs only approved/edited steps.
+- [x] Local drafts, overlap-aware calendar blocks, notes, and note search.
+- [x] Calendar/notes/drafts views and a filterable audit timeline.
+- [x] Policy is re-checked immediately before execution; failures are recorded per step.
+- [x] Every local result links back to its approving step and session.
 
 ## Phase 5 — Learning demo
 

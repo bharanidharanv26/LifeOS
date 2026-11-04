@@ -67,11 +67,11 @@ export function PlanCard({ step, locked }: { step: Step; locked: boolean }) {
   const [form, setForm] = useState<'edit' | 'reject' | null>(null);
   const [draft, setDraft] = useState<Record<string, unknown>>(step.edited_args ?? step.args);
   const [reason, setReason] = useState('');
-  const { active, memories, selectedStepId, pending, review } = useWorkspace();
+  const { active, memories, selectedStepId, pending, review, executing } = useWorkspace();
   const Icon = icons[step.tool];
   const blocked = step.policy_warnings.some((warning) => warning.blocking);
   const finished = locked || ['executed', 'failed'].includes(step.status);
-  const busy = pending.includes(step.id);
+  const busy = pending.includes(step.id) || executing;
   const validation = toolArgsSchemas[step.tool].safeParse(draft);
   const cited = step.memory_ids
     .map(

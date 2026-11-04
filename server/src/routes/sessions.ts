@@ -16,6 +16,10 @@ export function sessionsRouter(agent: AgentService): Router {
   router.get('/:id', (request, response) =>
     response.json(agent.getSession(z.uuid().parse(request.params.id))),
   );
+  router.post('/:id/execute', (request, response) => {
+    emptyBodySchema.parse(request.body ?? {});
+    response.json(agent.executeSession(z.uuid().parse(request.params.id)));
+  });
   return router;
 }
 export function stepsRouter(agent: AgentService): Router {

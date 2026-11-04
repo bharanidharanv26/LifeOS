@@ -8,6 +8,7 @@ import { nextWeekday } from '../llm/mock.js';
 import { MemoryService, type Clock } from '../memory/service.js';
 import type { Memory } from '../memory/schemas.js';
 import { validateArgs, type ToolName } from '../tools/schemas.js';
+import { runTool } from '../tools/execute.js';
 import { checkPolicy } from './policy.js';
 import {
   planSchema,
@@ -446,5 +447,115 @@ export class AgentService {
       });
       return this.getStep(id);
     })();
+  }
+
+  executeSession(id: string) {
+    const row = this.db
+      .prepare<[string], { id: string; status: string }>(
+        'SELECT id,status FROM sessions WHERE id=?',
+      )
+      .get(id);
+    if (!row) throw new AppError(404, 'SESSION_NOT_FOUND', 'This session could not be found.');
+    if (row.status === 'planning' || this.busySessions.has(id))
+      throw new AppError(409, 'SESSION_BUSY', 'This session is still being planned.');
+    if (row.status === 'reflected')
+      throw new AppError(409, 'SESSION_LOCKED', 'A reflected session can no longer run actions.');
+    const plan = this.db
+      .prepare<[string], { id: string }>(
+        'SELECT id FROM plans WHERE session_id=? ORDER BY version DESC LIMIT 1',
+      )
+      .get(id);
+    if (!plan) throw new AppError(409, 'NO_PLAN', 'This session has no plan to run.');
+    const steps = this.db
+      .prepare<[string], { id: string }>(
+        'SELECT id FROM plan_steps WHERE plan_id=? ORDER BY order_idx',
+      )
+      .all(plan.id)
+      .map((step) => this.getStep(step.id));
+    const eligible = steps.filter((step) => step.status === 'approved' || step.status === 'edited');
+    if (eligible.length === 0)
+      throw new AppError(
+        409,
+        'NOTHING_TO_RUN',
+        'Approve at least one safe step before running this plan.',
+      );
+    this.db.prepare("UPDATE sessions SET status='executing' WHERE id=?").run(id);
+    this.audit('user', 'session.execute', 'session', id, {
+      attempted: eligible.map((step) => step.id),
+    });
+    const preferences = this.memories.list({ type: 'preference', limit: 200 }).memories;
+    let succeeded = 0;
+    const failures: { step_id: string; code: string; message: string }[] = [];
+    for (const step of eligible) {
+      const now = this.clock().toISOString();
+      const args = step.edited_args ?? step.args;
+      const warnings = checkPolicy({ ...step, args }, preferences);
+      const blocking = warnings.filter((warning) => warning.blocking);
+      if (blocking.length > 0) {
+        const message = 'This step now conflicts with your current preferences.';
+        this.db
+          .prepare(
+            "UPDATE plan_steps SET status='failed',executed_at=?,result_json=?,policy_json=? WHERE id=?",
+          )
+          .run(
+            now,
+            JSON.stringify({ error: { code: 'POLICY_CONFLICT', message }, simulated: true }),
+            JSON.stringify(warnings),
+            step.id,
+          );
+        this.audit('system', 'step.failed', 'step', step.id, {
+          code: 'POLICY_CONFLICT',
+          warnings: blocking,
+        });
+        failures.push({ step_id: step.id, code: 'POLICY_CONFLICT', message });
+        continue;
+      }
+      try {
+        const result = this.db.transaction(() => {
+          const output = runTool(this.db, step.tool, args, step.id);
+          this.db
+            .prepare(
+              "UPDATE plan_steps SET status='executed',executed_at=?,result_json=? WHERE id=?",
+            )
+            .run(now, JSON.stringify(output), step.id);
+          return output;
+        })();
+        this.audit('user', 'step.executed', 'step', step.id, {
+          tool: step.tool,
+          result,
+        });
+        succeeded += 1;
+      } catch (error) {
+        const failure =
+          error instanceof AppError
+            ? error
+            : new AppError(500, 'EXECUTION_FAILED', 'This local action could not be completed.');
+        this.db
+          .prepare("UPDATE plan_steps SET status='failed',executed_at=?,result_json=? WHERE id=?")
+          .run(
+            now,
+            JSON.stringify({
+              error: { code: failure.code, message: failure.message },
+              simulated: true,
+            }),
+            step.id,
+          );
+        this.audit('system', 'step.failed', 'step', step.id, {
+          code: failure.code,
+          message: failure.message,
+        });
+        failures.push({ step_id: step.id, code: failure.code, message: failure.message });
+      }
+    }
+    this.db.prepare("UPDATE sessions SET status='completed' WHERE id=?").run(id);
+    this.audit('system', 'session.executed', 'session', id, {
+      attempted: eligible.length,
+      succeeded,
+      failed: failures.length,
+    });
+    return {
+      ...this.getSession(id),
+      execution: { attempted: eligible.length, succeeded, failed: failures.length, failures },
+    };
   }
 }
