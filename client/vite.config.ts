@@ -12,7 +12,7 @@ export default defineConfig(({ mode }) => {
     envDir: root,
     server: {
       host: '127.0.0.1',
-      port: Number(env.VITE_PORT ?? 8088),
+      port: 8088,
       strictPort: true,
       proxy: {
         '/api': { target: env.VITE_API_PROXY_TARGET ?? 'http://127.0.0.1:3001' },
@@ -20,7 +20,7 @@ export default defineConfig(({ mode }) => {
     },
     preview: {
       host: '127.0.0.1',
-      port: Number(env.VITE_PORT ?? 8088),
+      port: 8088,
       strictPort: true,
     },
   };

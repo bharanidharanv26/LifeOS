@@ -11,7 +11,7 @@ npm install
 npm run demo
 ```
 
-Open **http://localhost:8088**. No account, API key, or external service is required. The API runs at **http://127.0.0.1:3001**. `npm run demo` seeds five fictional preferences and starts both workspaces; Ctrl+C stops them.
+Open **http://localhost:8088**. No account, API key, or external service is required. The API runs at **http://127.0.0.1:3001**. `npm run demo` frees ports 3001 and 8088, seeds five fictional preferences and starts both workspaces; Ctrl+C stops them.
 
 ## Why it is different
 
@@ -135,7 +135,7 @@ Copy `.env.example` to `.env`. Defaults work offline.
 | `EMBEDDINGS_BASE_URL` / `EMBEDDINGS_API_KEY`  | model values                                  | OpenAI-compatible `/embeddings` endpoint              |
 | `EMBEDDINGS_MODEL`                            | `embedding-model-configure-me`                | Exact embedding model identifier                      |
 | `EMBEDDINGS_TIMEOUT_MS` / `EMBEDDINGS_WEIGHT` | `8000` / `0.35`                               | Per-attempt timeout and semantic blend weight         |
-| `VITE_PORT` / `VITE_API_PROXY_TARGET`         | `8088` / `127.0.0.1:3001`                     | Dev server and API proxy                              |
+| `VITE_API_PROXY_TARGET`                       | `http://127.0.0.1:3001`                       | API proxy; client and preview use fixed port 8088     |
 
 ## Privacy and control
 
