@@ -1,0 +1,88 @@
+import cors from 'cors';
+import express from 'express';
+import { rateLimit } from 'express-rate-limit';
+import helmet from 'helmet';
+import type { Config } from './config.js';
+import type { LifeDatabase } from './db/index.js';
+import { AppError, errorHandler } from './errors.js';
+import { MemoryService, type Clock } from './memory/service.js';
+import { demoRouter } from './routes/demo.js';
+import { healthRouter } from './routes/health.js';
+import { memoriesRouter } from './routes/memories.js';
+import { createLlmClient } from './llm/client.js';
+import { AgentService } from './agent/service.js';
+import { sessionsRouter, stepsRouter } from './routes/sessions.js';
+
+export interface AppDependencies {
+  db: LifeDatabase;
+  config: Config;
+  clock?: Clock;
+}
+
+export function createApp({
+  db,
+  config,
+  clock = () => new Date(),
+}: AppDependencies): express.Express {
+  const app = express();
+  const memories = new MemoryService(db, clock);
+  const agent = new AgentService(db, createLlmClient(db, config), clock);
+  app.disable('x-powered-by');
+  app.set('query parser', 'simple');
+  app.use(helmet());
+  app.use(
+    cors({
+      origin: (origin, callback) => {
+        if (!origin || origin === config.clientOrigin) callback(null, true);
+        else
+          callback(new AppError(403, 'ORIGIN_NOT_ALLOWED', 'This browser origin is not allowed.'));
+      },
+      methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+      allowedHeaders: ['Content-Type'],
+    }),
+  );
+  app.use(
+    '/api',
+    rateLimit({
+      windowMs: 60_000,
+      limit: config.rateLimitMax,
+      standardHeaders: 'draft-8',
+      legacyHeaders: false,
+      message: {
+        error: {
+          code: 'RATE_LIMITED',
+          message: 'Too many requests. Please try again in a minute.',
+        },
+      },
+    }),
+  );
+  app.use((request, response, next) => {
+    response.setHeader('Cache-Control', 'no-store');
+    const hasBody =
+      Number(request.headers['content-length'] ?? 0) > 0 ||
+      Boolean(request.headers['transfer-encoding']);
+    if (hasBody && !request.is('application/json')) {
+      next(
+        new AppError(415, 'UNSUPPORTED_MEDIA_TYPE', 'Request bodies must use application/json.'),
+      );
+      return;
+    }
+    next();
+  });
+  app.use(express.json({ limit: '32kb', strict: true, inflate: false }));
+  app.use('/api/health', healthRouter(db, config));
+  app.use('/api/memories', memoriesRouter(memories));
+  app.use('/api/demo', demoRouter(db, clock));
+  app.use('/api/sessions', sessionsRouter(agent));
+  app.use('/api/steps', stepsRouter(agent));
+  app.get('/api/llm-calls', (_request, response) =>
+    response.json({
+      calls: db.prepare('SELECT * FROM llm_calls ORDER BY rowid DESC LIMIT 100').all(),
+    }),
+  );
+  app.use((_request, _response, next) =>
+    next(new AppError(404, 'NOT_FOUND', 'This API route does not exist.')),
+  );
+  app.use(errorHandler);
+  return app;
+}
