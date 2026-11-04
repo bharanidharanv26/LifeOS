@@ -5,16 +5,28 @@ import { z } from 'zod';
 
 export const repositoryRoot = fileURLToPath(new URL('../../', import.meta.url));
 
+const clientOriginSchema = z.url().refine((value) => new URL(value).origin === value, {
+  message: 'Use an exact origin without a path or trailing slash',
+});
+
 const environmentSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   HOST: z.string().trim().min(1).default('127.0.0.1'),
   PORT: z.coerce.number().int().min(1).max(65_535).default(3001),
   CLIENT_ORIGIN: z
-    .url()
-    .refine((value) => new URL(value).origin === value, {
-      message: 'Use an exact origin without a path or trailing slash',
-    })
-    .default('http://localhost:5173'),
+    .string()
+    .trim()
+    .min(1)
+    .default('http://localhost:8088,http://127.0.0.1:8088')
+    .superRefine((value, context) => {
+      const origins = value.split(',').map((origin) => origin.trim());
+      if (!origins.every((origin) => clientOriginSchema.safeParse(origin).success)) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Use comma-separated exact origins without paths or trailing slashes',
+        });
+      }
+    }),
   DATABASE_PATH: z.string().trim().min(1).default('server/data/lifeos.db'),
   RATE_LIMIT_MAX: z.coerce.number().int().positive().default(120),
   MOCK_MODE: z
@@ -54,6 +66,7 @@ export interface Config {
   host: string;
   port: number;
   clientOrigin: string;
+  clientOrigins: string[];
   databasePath: string;
   rateLimitMax: number;
   mockMode: boolean;
@@ -82,11 +95,13 @@ export function parseConfig(environment: Record<string, string | undefined>): Co
     );
   }
   const env = parsed.data;
+  const clientOrigins = env.CLIENT_ORIGIN.split(',').map((origin) => origin.trim());
   return {
     nodeEnv: env.NODE_ENV,
     host: env.HOST,
     port: env.PORT,
-    clientOrigin: env.CLIENT_ORIGIN,
+    clientOrigin: clientOrigins[0] ?? env.CLIENT_ORIGIN,
+    clientOrigins,
     databasePath:
       env.DATABASE_PATH === ':memory:'
         ? ':memory:'

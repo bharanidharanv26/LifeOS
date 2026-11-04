@@ -8,7 +8,7 @@ npm run check
 npm run demo
 ```
 
-Open `http://localhost:5173`. Use a clean workspace or click **Forget everything** in Memory first. Confirm the badge says **MOCK · SIMULATED** unless you have verified a live model. Disable notifications. Record at 1440px wide or larger, browser zoom 100%.
+Open `http://localhost:8088`. Use a clean workspace or click **Forget everything** in Memory first. Confirm the badge says **MOCK · SIMULATED** unless you have verified a live model. Disable notifications. Record at 1440px wide or larger, browser zoom 100%.
 
 Verify the loop in about one minute before recording:
 

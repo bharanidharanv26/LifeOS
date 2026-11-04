@@ -11,12 +11,17 @@ export default defineConfig(({ mode }) => {
     plugins: [react()],
     envDir: root,
     server: {
-      host: 'localhost',
-      port: Number(env.VITE_PORT ?? 5173),
+      host: '127.0.0.1',
+      port: Number(env.VITE_PORT ?? 8088),
       strictPort: true,
       proxy: {
         '/api': { target: env.VITE_API_PROXY_TARGET ?? 'http://127.0.0.1:3001' },
       },
+    },
+    preview: {
+      host: '127.0.0.1',
+      port: Number(env.VITE_PORT ?? 8088),
+      strictPort: true,
     },
   };
 });

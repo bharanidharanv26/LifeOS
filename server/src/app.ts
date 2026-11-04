@@ -35,7 +35,7 @@ export function createApp({
   app.use(
     cors({
       origin: (origin, callback) => {
-        if (!origin || origin === config.clientOrigin) callback(null, true);
+        if (!origin || config.clientOrigins.includes(origin)) callback(null, true);
         else
           callback(new AppError(403, 'ORIGIN_NOT_ALLOWED', 'This browser origin is not allowed.'));
       },

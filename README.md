@@ -11,7 +11,7 @@ npm install
 npm run demo
 ```
 
-Open **http://localhost:5173**. No account, API key, or external service is required. The API runs at **http://127.0.0.1:3001**. `npm run demo` seeds five fictional preferences and starts both workspaces; Ctrl+C stops them.
+Open **http://localhost:8088**. No account, API key, or external service is required. The API runs at **http://127.0.0.1:3001**. `npm run demo` seeds five fictional preferences and starts both workspaces; Ctrl+C stops them.
 
 ## Why it is different
 
@@ -116,26 +116,26 @@ Errors use `{ "error": { "code": "...", "message": "..." } }`. Mutations are str
 
 Copy `.env.example` to `.env`. Defaults work offline.
 
-| Variable                                      | Default                        | Description                                        |
-| --------------------------------------------- | ------------------------------ | -------------------------------------------------- |
-| `NODE_ENV`                                    | `development`                  | `development`, `test`, or `production`             |
-| `HOST` / `PORT`                               | `127.0.0.1` / `3001`           | API binding                                        |
-| `CLIENT_ORIGIN`                               | `http://localhost:5173`        | Exact CORS origin, no trailing slash               |
-| `DATABASE_PATH`                               | `server/data/lifeos.db`        | Relative to repo root; `:memory:` for tests        |
-| `RATE_LIMIT_MAX`                              | `120`                          | Requests per IP per minute                         |
-| `MOCK_MODE`                                   | `true`                         | Offline deterministic model                        |
-| `MODEL_BASE_URL`                              | `https://api.example.com/v1`   | OpenAI-compatible chat-completions base URL        |
-| `MODEL_API_KEY`                               | empty                          | Server-only credential; never a `VITE_*` value     |
-| `MODEL_NAME`                                  | `meta-model-configure-me`      | Exact provider model identifier                    |
-| `MODEL_AUTH_HEADER` / `MODEL_AUTH_PREFIX`     | `Authorization` / `Bearer`     | Provider auth shape                                |
-| `MODEL_JSON_MODE`                             | `true`                         | Request JSON object mode                           |
-| `MODEL_TIMEOUT_MS`                            | `8000`                         | Per-attempt timeout                                |
-| `MOCK_FALLBACK`                               | `false`                        | Opt in to labeled offline fallback                 |
-| `EMBEDDINGS_ENABLED`                          | `false`                        | Optional semantic reranking; keyword-only when off |
-| `EMBEDDINGS_BASE_URL` / `EMBEDDINGS_API_KEY`  | model values                   | OpenAI-compatible `/embeddings` endpoint           |
-| `EMBEDDINGS_MODEL`                            | `embedding-model-configure-me` | Exact embedding model identifier                   |
-| `EMBEDDINGS_TIMEOUT_MS` / `EMBEDDINGS_WEIGHT` | `8000` / `0.35`                | Per-attempt timeout and semantic blend weight      |
-| `VITE_PORT` / `VITE_API_PROXY_TARGET`         | `5173` / `127.0.0.1:3001`      | Dev server and API proxy                           |
+| Variable                                      | Default                                       | Description                                           |
+| --------------------------------------------- | --------------------------------------------- | ----------------------------------------------------- |
+| `NODE_ENV`                                    | `development`                                 | `development`, `test`, or `production`                |
+| `HOST` / `PORT`                               | `127.0.0.1` / `3001`                          | API binding                                           |
+| `CLIENT_ORIGIN`                               | `http://localhost:8088,http://127.0.0.1:8088` | Comma-separated exact CORS origins, no trailing slash |
+| `DATABASE_PATH`                               | `server/data/lifeos.db`                       | Relative to repo root; `:memory:` for tests           |
+| `RATE_LIMIT_MAX`                              | `120`                                         | Requests per IP per minute                            |
+| `MOCK_MODE`                                   | `true`                                        | Offline deterministic model                           |
+| `MODEL_BASE_URL`                              | `https://api.example.com/v1`                  | OpenAI-compatible chat-completions base URL           |
+| `MODEL_API_KEY`                               | empty                                         | Server-only credential; never a `VITE_*` value        |
+| `MODEL_NAME`                                  | `meta-model-configure-me`                     | Exact provider model identifier                       |
+| `MODEL_AUTH_HEADER` / `MODEL_AUTH_PREFIX`     | `Authorization` / `Bearer`                    | Provider auth shape                                   |
+| `MODEL_JSON_MODE`                             | `true`                                        | Request JSON object mode                              |
+| `MODEL_TIMEOUT_MS`                            | `8000`                                        | Per-attempt timeout                                   |
+| `MOCK_FALLBACK`                               | `false`                                       | Opt in to labeled offline fallback                    |
+| `EMBEDDINGS_ENABLED`                          | `false`                                       | Optional semantic reranking; keyword-only when off    |
+| `EMBEDDINGS_BASE_URL` / `EMBEDDINGS_API_KEY`  | model values                                  | OpenAI-compatible `/embeddings` endpoint              |
+| `EMBEDDINGS_MODEL`                            | `embedding-model-configure-me`                | Exact embedding model identifier                      |
+| `EMBEDDINGS_TIMEOUT_MS` / `EMBEDDINGS_WEIGHT` | `8000` / `0.35`                               | Per-attempt timeout and semantic blend weight         |
+| `VITE_PORT` / `VITE_API_PROXY_TARGET`         | `8088` / `127.0.0.1:3001`                     | Dev server and API proxy                              |
 
 ## Privacy and control
 

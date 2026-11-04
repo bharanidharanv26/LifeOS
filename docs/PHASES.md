@@ -23,7 +23,7 @@ npm run check
 npm run demo
 ```
 
-Expected: every check passes; `http://localhost:5173` shows a connected database and five demo memories; `http://127.0.0.1:3001/api/health` returns `status: "ok"`, `phase: 1`, and `mockMode: true` by default.
+Expected: every check passes; `http://localhost:8088` shows a connected database and five demo memories; `http://127.0.0.1:3001/api/health` returns `status: "ok"`, `phase: 1`, and `mockMode: true` by default.
 
 `npm run seed` is safe to repeat. The second run should report **0 added, 5 already present, 5 active memories**.
 
