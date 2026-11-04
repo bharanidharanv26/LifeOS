@@ -72,15 +72,15 @@ server/tests/          Memory, database, API, LLM, planning, execution, learning
 docs/                  Phase gates, decisions, architecture, prompt documentation
 ```
 
-The database holds `memories`, `memory_events`, `sessions`, `plans`, `plan_steps`, `calendar_events`, `notes`, `email_drafts`, `audit_log`, and `llm_calls`. Migrations are checksummed; applied files are never edited.
+The database holds `memories`, `memory_events`, `memory_embeddings`, `sessions`, `plans`, `plan_steps`, `calendar_events`, `notes`, `email_drafts`, `audit_log`, and `llm_calls`. Migrations are checksummed; applied files are never edited.
 
 ## What is real vs. simulated
 
-**Real:** SQLite persistence, migrations, memory lifecycle and retrieval, model adapter with repair retries, schema-validated planning, deterministic policy enforcement, approval workflow, local tool execution, reflection and memory updates, audit trail, export, reset, mock model.
+**Real:** SQLite persistence, migrations, memory lifecycle and retrieval, model adapter with repair retries, schema-validated planning, deterministic policy enforcement, approval workflow, local tool execution, reflection and memory updates, audit trail, export, reset, mock model. Retrieval can optionally blend cached embedding similarity; keyword ranking remains the default and the fallback.
 
 **Simulated by design:** email is a stored draft and is never sent; calendar blocks and notes stay in SQLite. There is no Gmail/Calendar OAuth, no external contact lookup, and no background agent. Every tool result is labeled `simulated: true`.
 
-**Live model mode:** set `MOCK_MODE=false`, then configure `MODEL_BASE_URL`, `MODEL_API_KEY`, `MODEL_NAME`, and—if the provider differs—`MODEL_AUTH_HEADER`, `MODEL_AUTH_PREFIX`, and `MODEL_JSON_MODE`. The single adaptation point is `mapProviderProtocol` in `server/src/llm/client.ts`. Confirm the exact Meta model identifier in Meta's documentation before recording a demo. In live mode, relevant prompts and memory context go to that endpoint; keys stay server-side. If a live call fails, `MOCK_FALLBACK=true` opts into clearly labeled offline fallback; the default is an honest error after three attempts.
+**Live model mode:** set `MOCK_MODE=false`, then configure `MODEL_BASE_URL`, `MODEL_API_KEY`, `MODEL_NAME`, and—if the provider differs—`MODEL_AUTH_HEADER`, `MODEL_AUTH_PREFIX`, and `MODEL_JSON_MODE`. The single adaptation point is `mapProviderProtocol` in `server/src/llm/client.ts`. Confirm the exact Meta model identifier in Meta's documentation before recording a demo. In live mode, relevant prompts and memory context go to that endpoint; keys stay server-side. If a live call fails, `MOCK_FALLBACK=true` opts into clearly labeled offline fallback; the default is an honest error after three attempts. `EMBEDDINGS_ENABLED=true` additionally sends the goal and memory key/value text to `/embeddings`; leave it off for a fully offline run.
 
 ## API
 
@@ -116,22 +116,26 @@ Errors use `{ "error": { "code": "...", "message": "..." } }`. Mutations are str
 
 Copy `.env.example` to `.env`. Defaults work offline.
 
-| Variable                                  | Default                      | Description                                    |
-| ----------------------------------------- | ---------------------------- | ---------------------------------------------- |
-| `NODE_ENV`                                | `development`                | `development`, `test`, or `production`         |
-| `HOST` / `PORT`                           | `127.0.0.1` / `3001`         | API binding                                    |
-| `CLIENT_ORIGIN`                           | `http://localhost:5173`      | Exact CORS origin, no trailing slash           |
-| `DATABASE_PATH`                           | `server/data/lifeos.db`      | Relative to repo root; `:memory:` for tests    |
-| `RATE_LIMIT_MAX`                          | `120`                        | Requests per IP per minute                     |
-| `MOCK_MODE`                               | `true`                       | Offline deterministic model                    |
-| `MODEL_BASE_URL`                          | `https://api.example.com/v1` | OpenAI-compatible chat-completions base URL    |
-| `MODEL_API_KEY`                           | empty                        | Server-only credential; never a `VITE_*` value |
-| `MODEL_NAME`                              | `meta-model-configure-me`    | Exact provider model identifier                |
-| `MODEL_AUTH_HEADER` / `MODEL_AUTH_PREFIX` | `Authorization` / `Bearer`   | Provider auth shape                            |
-| `MODEL_JSON_MODE`                         | `true`                       | Request JSON object mode                       |
-| `MODEL_TIMEOUT_MS`                        | `8000`                       | Per-attempt timeout                            |
-| `MOCK_FALLBACK`                           | `false`                      | Opt in to labeled offline fallback             |
-| `VITE_PORT` / `VITE_API_PROXY_TARGET`     | `5173` / `127.0.0.1:3001`    | Dev server and API proxy                       |
+| Variable                                      | Default                        | Description                                        |
+| --------------------------------------------- | ------------------------------ | -------------------------------------------------- |
+| `NODE_ENV`                                    | `development`                  | `development`, `test`, or `production`             |
+| `HOST` / `PORT`                               | `127.0.0.1` / `3001`           | API binding                                        |
+| `CLIENT_ORIGIN`                               | `http://localhost:5173`        | Exact CORS origin, no trailing slash               |
+| `DATABASE_PATH`                               | `server/data/lifeos.db`        | Relative to repo root; `:memory:` for tests        |
+| `RATE_LIMIT_MAX`                              | `120`                          | Requests per IP per minute                         |
+| `MOCK_MODE`                                   | `true`                         | Offline deterministic model                        |
+| `MODEL_BASE_URL`                              | `https://api.example.com/v1`   | OpenAI-compatible chat-completions base URL        |
+| `MODEL_API_KEY`                               | empty                          | Server-only credential; never a `VITE_*` value     |
+| `MODEL_NAME`                                  | `meta-model-configure-me`      | Exact provider model identifier                    |
+| `MODEL_AUTH_HEADER` / `MODEL_AUTH_PREFIX`     | `Authorization` / `Bearer`     | Provider auth shape                                |
+| `MODEL_JSON_MODE`                             | `true`                         | Request JSON object mode                           |
+| `MODEL_TIMEOUT_MS`                            | `8000`                         | Per-attempt timeout                                |
+| `MOCK_FALLBACK`                               | `false`                        | Opt in to labeled offline fallback                 |
+| `EMBEDDINGS_ENABLED`                          | `false`                        | Optional semantic reranking; keyword-only when off |
+| `EMBEDDINGS_BASE_URL` / `EMBEDDINGS_API_KEY`  | model values                   | OpenAI-compatible `/embeddings` endpoint           |
+| `EMBEDDINGS_MODEL`                            | `embedding-model-configure-me` | Exact embedding model identifier                   |
+| `EMBEDDINGS_TIMEOUT_MS` / `EMBEDDINGS_WEIGHT` | `8000` / `0.35`                | Per-attempt timeout and semantic blend weight      |
+| `VITE_PORT` / `VITE_API_PROXY_TARGET`         | `5173` / `127.0.0.1:3001`      | Dev server and API proxy                           |
 
 ## Privacy and control
 
@@ -148,7 +152,7 @@ Copy `.env.example` to `.env`. Defaults work offline.
 npm run check
 ```
 
-Runs strict TypeScript, ESLint with zero warnings, Prettier check, 52 backend tests, and both production builds. Tests cover memory math, migrations, validation, CORS, rate limits, planning, policy conflicts, review/execute flows, library links, and the full learning loop in isolated databases.
+Runs strict TypeScript, ESLint with zero warnings, Prettier check, 58 backend tests, and both production builds. Tests cover memory math, migrations, validation, CORS, rate limits, planning, policy conflicts, review/execute flows, library links, and the full learning loop in isolated databases.
 
 ```sh
 npm run seed        # add missing demo memories
@@ -160,7 +164,7 @@ npm run format      # apply Prettier
 ## Limitations and next steps
 
 - Email and calendar tools are deliberately local simulations, not OAuth integrations.
-- Retrieval is keyword-only (BM25-style) with confidence and recency. Hybrid embeddings are an optional next step; the keyword baseline must remain dependency-free.
+- Retrieval is BM25-style keyword ranking with confidence and recency. Optional embedding reranking is cached and default-off; if the endpoint fails, planning silently returns to keyword results, so semantic quality is not guaranteed in every live setup.
 - Reflection is explicit, not a background learner. One reflected session can seed the next plan, but there is no long-running daemon.
 - No streaming; planning shows a staged progress state instead.
 - Live-model prompts are provider-generic. Exact Meta model behavior should be validated end to end before a submission recording.

@@ -10,6 +10,7 @@ import { demoRouter } from './routes/demo.js';
 import { healthRouter } from './routes/health.js';
 import { memoriesRouter } from './routes/memories.js';
 import { createLlmClient } from './llm/client.js';
+import { createEmbedder } from './memory/embeddings.js';
 import { AgentService } from './agent/service.js';
 import { sessionsRouter, stepsRouter } from './routes/sessions.js';
 import { auditRouter, calendarRouter, draftsRouter, notesRouter } from './routes/library.js';
@@ -27,7 +28,7 @@ export function createApp({
 }: AppDependencies): express.Express {
   const app = express();
   const memories = new MemoryService(db, clock);
-  const agent = new AgentService(db, createLlmClient(db, config), clock);
+  const agent = new AgentService(db, createLlmClient(db, config), clock, createEmbedder(config));
   app.disable('x-powered-by');
   app.set('query parser', 'simple');
   app.use(helmet());

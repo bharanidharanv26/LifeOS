@@ -51,3 +51,13 @@
 - The prompt documentation quotes the exact system text and records validation order. Schema repair, semantic refinements, and deterministic policy are described as part of the product contract, not implementation trivia.
 - Demo recording guidance lives in `docs/DEMO.md` instead of committing binary screenshots. This keeps the repository reviewable and avoids screenshots drifting from the UI.
 - The health endpoint now reports phase 7. Test counts and phase gates stay in `docs/PHASES.md`; the README only states the current suite size.
+
+## Phase 8
+
+- Hybrid retrieval is opt-in and isolated from the default path. `EMBEDDINGS_ENABLED=false` keeps the dependency-free BM25 baseline that the offline demo and tests rely on.
+- Embedding failures are swallowed at the retrieval boundary rather than surfaced as planning errors. Semantic ranking is an enhancement, so a missing key, timeout, or malformed vector must not make the app unusable. Health still reports whether the endpoint is configured so the mode is never implied.
+- Vectors are cached by a hash of the memory's key and value, not its confidence or timestamps, so reinforcement does not trigger a re-embed. Migration 3 cascades deletes and the export omits derived vectors.
+- The semantic score is multiplied by memory confidence before blending, so a similar-sounding low-confidence memory cannot outrank a strong preference on meaning alone.
+- Blending and batching are fixed at 64 texts per request; the weight is configurable. This keeps request size bounded without adding a chunking dependency.
+- Streaming model responses were not implemented. The existing staged progress indicator reflects real workflow phases, and claiming token streaming would require a different adapter contract than the tested JSON path.
+- The offline mock does not call embeddings, so the guided demo remains byte-for-byte deterministic and network-free.

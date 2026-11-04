@@ -8,3 +8,7 @@ copyFileSync(
   new URL('../src/db/002-agent.sql', import.meta.url),
   new URL('../dist/db/002-agent.sql', import.meta.url),
 );
+copyFileSync(
+  new URL('../src/db/003-embeddings.sql', import.meta.url),
+  new URL('../dist/db/003-embeddings.sql', import.meta.url),
+);

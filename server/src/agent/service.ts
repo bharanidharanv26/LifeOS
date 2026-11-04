@@ -5,6 +5,7 @@ import { AppError } from '../errors.js';
 import type { LlmClient } from '../llm/client.js';
 import { PLAN_PROMPT, REFLECT_PROMPT, UNDERSTAND_PROMPT } from '../llm/prompts.js';
 import { nextWeekday } from '../llm/mock.js';
+import type { Embedder } from '../memory/embeddings.js';
 import { MemoryService, type Clock } from '../memory/service.js';
 import type { Memory } from '../memory/schemas.js';
 import { validateArgs, type ToolName } from '../tools/schemas.js';
@@ -99,6 +100,7 @@ export class AgentService {
     readonly db: LifeDatabase,
     readonly llm: LlmClient,
     readonly clock: Clock = () => new Date(),
+    readonly embedder: Embedder | null = null,
   ) {
     this.memories = new MemoryService(db, clock);
   }
@@ -217,7 +219,9 @@ export class AgentService {
         jsonSchema: understandSchema,
       });
       const understanding = understandSchema.parse(understood.json);
-      const relevant = this.memories.retrieveRelevant(goal, 8, { sessionId: id });
+      const relevant = await this.memories.retrieveRelevantHybrid(goal, 8, this.embedder, {
+        sessionId: id,
+      });
       const mandatory = [
         ...this.memories.list({ type: 'preference', limit: 200 }).memories,
         ...this.memories.list({ type: 'goal', limit: 200 }).memories,

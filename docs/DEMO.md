@@ -84,7 +84,7 @@ Invoke-RestMethod http://127.0.0.1:3001/api/health
 Invoke-RestMethod http://127.0.0.1:3001/api/export -OutFile lifeos-export.json
 ```
 
-Expected: `phase: 7`, five demo memories after seeding, and model calls labeled `mock` in offline mode. The export contains memories, sessions, plans, steps, drafts, notes, calendar events, audit entries, and model-call metadata.
+Expected: `phase: 8`, `retrieval: "keyword"` unless embeddings are explicitly enabled, five demo memories after seeding, and model calls labeled `mock` in offline mode. The export contains memories, sessions, plans, steps, drafts, notes, calendar events, audit entries, and model-call metadata.
 
 ## Submission form answers
 

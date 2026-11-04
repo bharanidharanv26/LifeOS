@@ -92,4 +92,11 @@ Expected: every check passes; `http://localhost:5173` shows a connected database
 
 ## Phase 8 — Optional
 
-- Embedding-based hybrid retrieval, streaming responses, and demo-script refinements.
+**Hybrid retrieval complete. Gate: `npm run check` passed; 58 tests.** Streaming responses were deliberately not added; the existing staged planning indicator is honest and the model adapter is non-streaming.
+
+- [x] Opt-in hybrid retrieval through an OpenAI-compatible `POST /embeddings` endpoint (`EMBEDDINGS_ENABLED`).
+- [x] Vectors cached by memory content hash in migration 3 with cascade delete; only new or changed text is embedded.
+- [x] Blend weight configurable; keyword ranking remains the default and the automatic fallback on any embedding failure.
+- [x] Health reports `retrieval: "keyword" | "hybrid"` and whether the endpoint is actually configured.
+- [x] Tests cover semantic-only ranking, caching, keyword fallback, configuration defaults, and cosine math.
+- [ ] Streaming progress and further demo-script refinement: intentionally out of scope for this pass.

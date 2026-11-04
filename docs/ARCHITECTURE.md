@@ -19,6 +19,7 @@ flowchart TB
     Tools[runTool]
     LLM[LLM client]
     Mock[Deterministic mock]
+    Embed[Optional embedding client]
   end
   DB[(SQLite)]
   Store -->|/api via Vite proxy| API
@@ -29,6 +30,8 @@ flowchart TB
   Agent --> LLM
   LLM -->|MOCK_MODE=true| Mock
   LLM -.->|MOCK_MODE=false| Model[Meta-compatible endpoint]
+  Agent --> Embed
+  Embed -.->|EMBEDDINGS_ENABLED=true| EmbedAPI[Embeddings endpoint]
   Memory --> DB
   Agent --> DB
   Tools --> DB
@@ -45,7 +48,7 @@ Trust boundaries: the browser never sees credentials or prompts. The API binds t
 
 1. Persist a session with `goal_text`, `demo_scenario`, and status `planning`.
 2. `understand()` calls the model with `UNDERSTAND_PROMPT`, validates the response, and falls back to deterministic extraction if needed.
-3. Retrieve memories through BM25-style ranking, confidence, and recency.
+3. Retrieve memories through BM25-style ranking, confidence, and recency. When `EMBEDDINGS_ENABLED=true`, the same step blends cached cosine similarity with keyword scores, and any embedding failure returns the keyword ranking.
 4. `plan()` sends the goal, retrieved context, policy summary, and tool contracts with `PLAN_PROMPT`.
 5. Validate with Zod: maximum 8 steps, known tools, schema-valid args, cited memory IDs restricted to supplied context.
 6. Run `checkPolicy` on every calendar step and persist blocking/non-blocking warnings.
@@ -90,7 +93,8 @@ Reflection is explicit and one-time:
 - Contradiction: `−0.25`, then auto-archive below `0.15`.
 - Idle decay: 30-day grace, then `−0.01` per full 30 unused days, applied at startup, daily, and before retrieval.
 - Same-key conflicts preserve before/after values in `memory_events`. Unrelated preferences are never weakened.
-- Retrieval is keyword-only: tokenized BM25-style scoring, small domain synonyms, confidence and recency weighting, plus a human-readable explanation stored with each proposal.
+- Retrieval is BM25-style by default: tokenized scoring, small domain synonyms, confidence and recency weighting, plus a human-readable explanation stored with each proposal.
+- Optional hybrid mode caches vectors per memory content hash in `memory_embeddings`, embeds only new or changed text, and blends normalized keyword and cosine scores. The keyword path remains the fallback and requires no dependency or network.
 
 ## Policy engine
 
@@ -107,13 +111,14 @@ Deterministic and independent of the model:
 
 `schema_migrations` stores version, name, checksum, and application time. Applied files are immutable; changes require a new numbered migration. Writes and their memory/audit evidence share transactions. WAL is checkpointed on graceful shutdown. `PRAGMA foreign_keys` is enabled.
 
-Tables: `memories`, `memory_events`, `sessions`, `plans`, `plan_steps`, `calendar_events`, `notes`, `email_drafts`, `audit_log`, `llm_calls`.
+Tables: `memories`, `memory_events`, `memory_embeddings`, `sessions`, `plans`, `plan_steps`, `calendar_events`, `notes`, `email_drafts`, `audit_log`, `llm_calls`.
 
 ## Model adapter
 
 - One OpenAI-compatible chat-completions path, with the provider mapping isolated in `mapProviderProtocol`.
 - Three attempts with exponential backoff; two schema-repair retries; code-fence stripping; 32 KB request body discipline; 8-second default timeout.
 - Every call is recorded with purpose, model, latency, token usage when supplied, retries, mode, and error code. Prompts are not stored in the activity drawer or export.
+- Embeddings use the same auth shape and a bounded batch size. Vectors are derived data, excluded from export, and removed with their memory by foreign-key cascade.
 - `MOCK_MODE=true` uses deterministic responses that implement the same contracts, including reflection.
 - Live failures are honest errors unless `MOCK_FALLBACK=true`, in which case the result is labeled fallback.
 
@@ -136,6 +141,6 @@ Tables: `memories`, `memory_events`, `sessions`, `plans`, `plan_steps`, `calenda
 
 - Single user, no authentication; do not expose the API to untrusted networks.
 - Simulated tools only; no OAuth or external side effects.
-- Keyword retrieval is intentional and dependency-free.
+- Keyword retrieval is the default and dependency-free. Hybrid mode is opt-in, scoped to retrieval, and degrades to keyword without surfacing an error to the plan.
 - Times are UTC end to end; user timezone is never inferred.
 - The learning loop is session-scoped, not a background daemon.

@@ -1,7 +1,8 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import type { LifeDatabase } from '../db/index.js';
 import { AppError } from '../errors.js';
+import { cosineSimilarity, type Embedder } from './embeddings.js';
 import { rankMemories } from './retrieval.js';
 import {
   addMemorySchema,
@@ -351,6 +352,134 @@ export class MemoryService {
       }
       return matches.map((memory) => ({ ...memory, last_used_at: now.toISOString() }));
     })();
+  }
+
+  /**
+   * Optional hybrid retrieval: BM25 blended with cached embedding similarity.
+   * Any failure falls back to the dependency-free keyword path, which remains
+   * the default and the only path when EMBEDDINGS_ENABLED is false.
+   */
+  async retrieveRelevantHybrid(
+    query: string,
+    k = 8,
+    embedder: Embedder | null,
+    context: MemoryContext = {},
+  ): Promise<RetrievedMemory[]> {
+    if (!embedder) return this.retrieveRelevant(query, k, context);
+    const validated = retrieveMemoriesSchema.parse({ query, k });
+    try {
+      this.decayUnusedMemories();
+      const now = this.clock();
+      const active = this.db
+        .prepare<[], MemoryRow>('SELECT * FROM memories WHERE archived = 0')
+        .all()
+        .map(fromRow);
+      if (active.length === 0) return [];
+      const keyword = rankMemories(active, validated.query, now, active.length);
+      const keywordScore = new Map(keyword.map((memory) => [memory.id, memory.score]));
+      const maxKeyword = keyword.reduce((max, memory) => Math.max(max, memory.score), 0);
+      const hashOf = (memory: Memory): string =>
+        createHash('sha256').update(`${memory.key}\n${memory.value}`).digest('hex');
+      const cached = new Map(
+        this.db
+          .prepare<[string], { memory_id: string; content_hash: string; vector_json: string }>(
+            'SELECT memory_id, content_hash, vector_json FROM memory_embeddings WHERE model = ?',
+          )
+          .all(embedder.model)
+          .map((row) => [row.memory_id, row] as const),
+      );
+      const missing = active.filter((memory) => {
+        const row = cached.get(memory.id);
+        return !row || row.content_hash !== hashOf(memory);
+      });
+      const queryVector = (await embedder.embed([validated.query]))[0];
+      if (!queryVector)
+        throw new AppError(502, 'EMBEDDINGS_INVALID_OUTPUT', 'No query vector was returned.');
+      const fresh = new Map<string, number[]>();
+      for (let index = 0; index < missing.length; index += 64) {
+        const chunk = missing.slice(index, index + 64);
+        const vectors = await embedder.embed(
+          chunk.map((memory) => `${memory.key}: ${memory.value}`),
+        );
+        chunk.forEach((memory, offset) => {
+          const vector = vectors[offset];
+          if (vector) fresh.set(memory.id, vector);
+        });
+      }
+      const vectorFor = (memory: Memory): number[] | null => {
+        const row = cached.get(memory.id);
+        if (row && row.content_hash === hashOf(memory)) {
+          const parsed = z
+            .array(z.number().finite())
+            .safeParse(JSON.parse(row.vector_json) as unknown);
+          if (parsed.success) return parsed.data;
+        }
+        return fresh.get(memory.id) ?? null;
+      };
+      const scored = active
+        .flatMap((memory) => {
+          const vector = vectorFor(memory);
+          const similarity = vector ? cosineSimilarity(queryVector, vector) : 0;
+          const keywordPart = maxKeyword > 0 ? (keywordScore.get(memory.id) ?? 0) / maxKeyword : 0;
+          const semanticPart = Math.max(0, similarity) * memory.confidence;
+          const score = keywordPart * (1 - embedder.weight) + semanticPart * embedder.weight;
+          if (score < 0.01) return [];
+          return [
+            {
+              ...memory,
+              score: Math.round(score * 1_000_000) / 1_000_000,
+              why_retrieved: `Hybrid ${keywordScore.has(memory.id) ? 'keyword + ' : ''}semantic ${Math.round(Math.max(0, similarity) * 100)}%; ${Math.round(memory.confidence * 100)}% confidence.`,
+            },
+          ];
+        })
+        .sort(
+          (a, b) =>
+            b.score - a.score ||
+            b.updated_at.localeCompare(a.updated_at) ||
+            a.id.localeCompare(b.id),
+        )
+        .slice(0, validated.k);
+      this.db.transaction(() => {
+        for (const [memoryId, vector] of fresh) {
+          const memory = active.find((item) => item.id === memoryId);
+          if (!memory) continue;
+          this.db
+            .prepare(
+              `INSERT INTO memory_embeddings (memory_id, model, content_hash, dim, vector_json, updated_at)
+               VALUES (?,?,?,?,?,?)
+               ON CONFLICT(memory_id) DO UPDATE SET model=excluded.model, content_hash=excluded.content_hash, dim=excluded.dim, vector_json=excluded.vector_json, updated_at=excluded.updated_at`,
+            )
+            .run(
+              memory.id,
+              embedder.model,
+              hashOf(memory),
+              vector.length,
+              JSON.stringify(vector),
+              now.toISOString(),
+            );
+        }
+        for (const memory of scored) {
+          this.db
+            .prepare('UPDATE memories SET last_used_at = ? WHERE id = ?')
+            .run(now.toISOString(), memory.id);
+          this.recordEvent(
+            memory.id,
+            'used',
+            {
+              reason: context.reason ?? 'Retrieved with hybrid search to inform a plan.',
+              query: validated.query,
+              score: memory.score,
+              why_retrieved: memory.why_retrieved,
+            },
+            { actor: 'agent', ...context },
+          );
+        }
+      })();
+      return scored;
+    } catch {
+      // Embeddings are an enhancement, never a dependency of the demo.
+      return this.retrieveRelevant(query, k, context);
+    }
   }
 
   /** 30-day grace, then -0.01 per full 30 unused days. Reads never double-decay. */

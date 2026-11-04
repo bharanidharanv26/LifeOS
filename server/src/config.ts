@@ -38,6 +38,15 @@ const environmentSchema = z.object({
     .enum(['true', 'false'])
     .default('false')
     .transform((value) => value === 'true'),
+  EMBEDDINGS_ENABLED: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((value) => value === 'true'),
+  EMBEDDINGS_BASE_URL: z.url().optional(),
+  EMBEDDINGS_API_KEY: z.string().optional(),
+  EMBEDDINGS_MODEL: z.string().trim().min(1).default('embedding-model-configure-me'),
+  EMBEDDINGS_TIMEOUT_MS: z.coerce.number().int().min(100).max(120_000).default(8000),
+  EMBEDDINGS_WEIGHT: z.coerce.number().min(0).max(1).default(0.35),
 });
 
 export interface Config {
@@ -56,6 +65,12 @@ export interface Config {
   modelJsonMode: boolean;
   modelTimeoutMs: number;
   mockFallback: boolean;
+  embeddingsEnabled: boolean;
+  embeddingsBaseUrl: string;
+  embeddingsApiKey: string;
+  embeddingsModel: string;
+  embeddingsTimeoutMs: number;
+  embeddingsWeight: number;
 }
 
 export function parseConfig(environment: Record<string, string | undefined>): Config {
@@ -86,6 +101,12 @@ export function parseConfig(environment: Record<string, string | undefined>): Co
     modelJsonMode: env.MODEL_JSON_MODE,
     modelTimeoutMs: env.MODEL_TIMEOUT_MS,
     mockFallback: env.MOCK_FALLBACK,
+    embeddingsEnabled: env.EMBEDDINGS_ENABLED,
+    embeddingsBaseUrl: env.EMBEDDINGS_BASE_URL ?? env.MODEL_BASE_URL,
+    embeddingsApiKey: env.EMBEDDINGS_API_KEY ?? env.MODEL_API_KEY,
+    embeddingsModel: env.EMBEDDINGS_MODEL,
+    embeddingsTimeoutMs: env.EMBEDDINGS_TIMEOUT_MS,
+    embeddingsWeight: env.EMBEDDINGS_WEIGHT,
   };
 }
 

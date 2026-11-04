@@ -4,9 +4,10 @@ import path from 'node:path';
 import Database from 'better-sqlite3';
 
 export type LifeDatabase = Database.Database;
-export const migrationVersion = 2;
+export const migrationVersion = 3;
 
 export const applicationTables = [
+  'memory_embeddings',
   'memory_events',
   'calendar_events',
   'notes',
@@ -38,6 +39,11 @@ export function migrate(db: LifeDatabase): void {
       version: 2,
       name: 'agent',
       sql: readFileSync(new URL('./002-agent.sql', import.meta.url), 'utf8'),
+    },
+    {
+      version: 3,
+      name: 'embeddings',
+      sql: readFileSync(new URL('./003-embeddings.sql', import.meta.url), 'utf8'),
     },
   ];
 

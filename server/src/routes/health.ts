@@ -9,12 +9,17 @@ export function healthRouter(db: LifeDatabase, config: Config): Router {
     response.json({
       status: 'ok',
       app: 'LifeOS',
-      phase: 7,
+      phase: 8,
       database: 'connected',
       mockMode: config.mockMode,
       model: config.modelName,
       modelIntegration: 'available',
       mockFallback: config.mockFallback,
+      retrieval: config.embeddingsEnabled ? 'hybrid' : 'keyword',
+      embeddingsConfigured:
+        config.embeddingsEnabled &&
+        Boolean(config.embeddingsApiKey) &&
+        !config.embeddingsBaseUrl.includes('api.example.com'),
       timezone: 'UTC',
     });
   });
