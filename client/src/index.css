@@ -1071,6 +1071,13 @@
   .onboarding-dots button.active {
     background: rgb(var(--accent));
   }
+  .data-card {
+    margin-top: 22px;
+    border: 1px solid rgb(var(--line));
+    border-radius: 14px;
+    background: rgb(var(--panel));
+    padding: 20px;
+  }
 }
 @media (hover: hover) and (pointer: fine) {
   .button:not(.primary):not(:disabled):hover,

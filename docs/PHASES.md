@@ -1,6 +1,6 @@
 # LifeOS phase gates
 
-Phases 1–6 are implemented. Every phase passes `npm run check` before the next begins.
+Phases 1–7 are implemented. Every phase passes `npm run check` before the next begins.
 
 ## Phase 1 — Foundation
 
@@ -81,9 +81,14 @@ Expected: every check passes; `http://localhost:5173` shows a connected database
 
 ## Phase 7 — Release readiness
 
-- End-to-end checks, expanded README, screenshots/GIF, architecture and prompt documentation.
-- JSON export and confirmed in-app forget control.
-- Document exact Meta model configuration and the real-versus-mock contract.
+**Complete. Gate: `npm run check` passed; 53 tests.**
+
+- [x] `GET /api/export` downloads every user table as JSON; the Memory view offers Export JSON.
+- [x] In-app **Forget everything** requires typing `FORGET EVERYTHING`, calls the existing reset endpoint, and refreshes the workspace.
+- [x] README rewritten for a final submission: pitch, quick start, exact demo script, architecture diagram, API, environment, privacy, real-vs-mock, limitations.
+- [x] `docs/ARCHITECTURE.md` and `docs/PROMPTS.md` document the lifecycle, memory math, policy engine, model contracts, retries, and mock behavior.
+- [x] `.env.example` reflects live-model configuration and the single `mapProviderProtocol` adaptation point.
+- [x] `docs/DEMO.md` records the three-minute recording shot list and verification commands.
 
 ## Phase 8 — Optional
 

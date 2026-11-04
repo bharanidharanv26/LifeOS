@@ -85,6 +85,25 @@ export function createApp({
       calls: db.prepare('SELECT * FROM llm_calls ORDER BY rowid DESC LIMIT 100').all(),
     }),
   );
+  app.get('/api/export', (_request, response) => {
+    const all = (table: string) => db.prepare(`SELECT * FROM ${table}`).all();
+    response.setHeader('Content-Disposition', 'attachment; filename="lifeos-export.json"');
+    response.json({
+      app: 'LifeOS',
+      export_version: 1,
+      exported_at: clock().toISOString(),
+      memories: all('memories'),
+      memory_events: all('memory_events'),
+      sessions: all('sessions'),
+      plans: all('plans'),
+      plan_steps: all('plan_steps'),
+      calendar_events: all('calendar_events'),
+      notes: all('notes'),
+      email_drafts: all('email_drafts'),
+      audit_log: all('audit_log'),
+      llm_calls: all('llm_calls'),
+    });
+  });
   app.use((_request, _response, next) =>
     next(new AppError(404, 'NOT_FOUND', 'This API route does not exist.')),
   );

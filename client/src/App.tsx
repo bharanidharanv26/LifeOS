@@ -28,6 +28,7 @@ import { LearnedCard } from './components/LearnedCard';
 import { PlanComparison } from './components/PlanComparison';
 import { Onboarding } from './components/Onboarding';
 import { DemoDrawer, ModelDrawer } from './components/Drawers';
+import { DataPrivacy } from './components/DataPrivacy';
 import { CalendarView } from './components/CalendarView';
 import { NotesView } from './components/NotesView';
 import { DraftsView } from './components/DraftsView';
@@ -362,7 +363,10 @@ export default function App() {
             </form>
 
             {state.view === 'Memory' ? (
-              <MemoryPanel expanded />
+              <>
+                <MemoryPanel expanded />
+                <DataPrivacy />
+              </>
             ) : state.view === 'Calendar' ? (
               <CalendarView />
             ) : state.view === 'Notes' ? (

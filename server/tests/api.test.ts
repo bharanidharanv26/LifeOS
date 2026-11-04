@@ -184,6 +184,22 @@ describe('Phase 1 REST API', () => {
     ).toMatchObject({ inserted: 5 });
   });
 
+  it('exports every user table as a downloadable JSON snapshot without credentials', async () => {
+    await request(fixture.app).post('/api/demo/seed').send({}).expect(200);
+    const exported = await request(fixture.app).get('/api/export').expect(200);
+    expect(exported.headers['content-disposition']).toContain('lifeos-export.json');
+    expect(exported.body).toMatchObject({
+      app: 'LifeOS',
+      export_version: 1,
+      exported_at: expect.any(String),
+    });
+    expect(exported.body.memories).toHaveLength(5);
+    expect(exported.body).toHaveProperty('sessions');
+    expect(exported.body).toHaveProperty('plan_steps');
+    expect(exported.body).toHaveProperty('audit_log');
+    expect(exported.text).not.toContain('secret-never-return-this');
+  });
+
   it('restricts CORS to the configured client origin, including browser preflight', async () => {
     const allowed = await request(fixture.app)
       .get('/api/health')

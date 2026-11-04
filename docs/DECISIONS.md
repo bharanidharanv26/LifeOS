@@ -19,10 +19,10 @@
 ## Phase 4
 
 - Execution re-checks the deterministic preference policy immediately before each local action, so a preference changed after approval still blocks the action. Each step runs in its own transaction: a failure is recorded on that step and does not roll back other completed local results.
-  +- Only `approved` and `edited` steps run. `executed` and `failed` steps never repeat. A session may run a second batch after more steps are approved.
-  +- Calendar blocks refuse to run when they overlap an existing local event (`CALENDAR_OVERLAP`). Duplicate creation is therefore impossible, and the conflicting block is named in the error.
-  +- Library APIs return the approving step, session, and originating goal so every calendar block, note, and draft can link back to its plan context.
-  +- Search notes is local-only and returns bounded excerpts. No email is sent, no external calendar is touched, and every result is labeled `simulated: true`.
+- Only `approved` and `edited` steps run. `executed` and `failed` steps never repeat. A session may run a second batch after more steps are approved.
+- Calendar blocks refuse to run when they overlap an existing local event (`CALENDAR_OVERLAP`). Duplicate creation is therefore impossible, and the conflicting block is named in the error.
+- Library APIs return the approving step, session, and originating goal so every calendar block, note, and draft can link back to its plan context.
+- Search notes is local-only and returns bounded excerpts. No email is sent, no external calendar is touched, and every result is labeled `simulated: true`.
 
 ## Phase 5
 
@@ -42,3 +42,12 @@
 - The demo script is a static drawer, not generated content, so the runbook cannot drift from what the seeded fixture actually does. Buttons remount the same seed path the onboarding uses.
 - Screens announce planning, execution, and learning through one polite live region instead of dozens of focus moves. Dialogs take initial focus and close on Escape; focus rings are global; reduced-motion rules already disable motion and now cover drawer and onboarding transitions.
 - On small screens the breadcrumb is dropped before any action button, and icon buttons grow to 40px targets. Mode badges remain visible at all widths.
+
+## Phase 7
+
+- Export is a single JSON snapshot with `export_version`, every application table, and no credentials or prompts. It is streamed as a browser download rather than a separate report format so users can inspect or migrate it without tooling.
+- Forget is not a one-click destructive action. The user must type `FORGET EVERYTHING` exactly, matching the API contract. The reset remains one transaction and clears history too; the UI refreshes every derived view afterward.
+- Documentation states plainly what is simulated, what leaves the device in live mode, and what the product does not do. The README leads with the demo rather than an architecture essay.
+- The prompt documentation quotes the exact system text and records validation order. Schema repair, semantic refinements, and deterministic policy are described as part of the product contract, not implementation trivia.
+- Demo recording guidance lives in `docs/DEMO.md` instead of committing binary screenshots. This keeps the repository reviewable and avoids screenshots drifting from the UI.
+- The health endpoint now reports phase 7. Test counts and phase gates stay in `docs/PHASES.md`; the README only states the current suite size.

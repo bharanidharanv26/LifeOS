@@ -9,7 +9,7 @@ export function healthRouter(db: LifeDatabase, config: Config): Router {
     response.json({
       status: 'ok',
       app: 'LifeOS',
-      phase: 5,
+      phase: 7,
       database: 'connected',
       mockMode: config.mockMode,
       model: config.modelName,
