@@ -40,6 +40,10 @@ export function memoriesRouter(memories: MemoryService): Router {
     const query = historyQuerySchema.parse(request.query);
     response.json({ events: memories.history(id, query.limit, query.offset) });
   });
+  router.post('/:id/restore', (request, response) => {
+    emptyBodySchema.parse(request.body ?? {});
+    response.json({ memory: memories.restore(memoryIdSchema.parse(request.params.id)) });
+  });
   router.get('/:id', (request, response) => {
     response.json({ memory: memories.getMemory(memoryIdSchema.parse(request.params.id)) });
   });

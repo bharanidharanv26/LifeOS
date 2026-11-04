@@ -7,6 +7,7 @@ import {
   addMemorySchema,
   editMemorySchema,
   memoryIdSchema,
+  memorySnapshotSchema,
   retrieveMemoriesSchema,
   type AddMemoryInput,
   type EditMemoryInput,
@@ -271,6 +272,37 @@ export class MemoryService {
         { actor: 'user', ...context },
       );
       return before;
+    })();
+  }
+
+  restore(id: string): Memory {
+    memoryIdSchema.parse(id);
+    return this.db.transaction(() => {
+      if (this.db.prepare('SELECT 1 FROM memories WHERE id=?').get(id))
+        throw new AppError(409, 'MEMORY_EXISTS', 'This memory already exists.');
+      const deleted = this.db
+        .prepare<[string], { detail: string }>(
+          "SELECT detail FROM memory_events WHERE memory_id=? AND event='deleted' ORDER BY rowid DESC LIMIT 1",
+        )
+        .get(id);
+      if (!deleted)
+        throw new AppError(404, 'MEMORY_NOT_FOUND', 'There is no deleted memory to restore.');
+      const { before } = z
+        .object({ before: memorySnapshotSchema })
+        .parse(JSON.parse(deleted.detail) as unknown);
+      const after = { ...before, updated_at: this.clock().toISOString() };
+      this.db
+        .prepare(
+          `INSERT INTO memories (id,type,key,value,rationale,confidence,source,times_confirmed,times_contradicted,created_at,updated_at,last_used_at,archived) VALUES (@id,@type,@key,@value,@rationale,@confidence,@source,@times_confirmed,@times_contradicted,@created_at,@updated_at,@last_used_at,@archived)`,
+        )
+        .run({ ...after, archived: Number(after.archived) });
+      this.recordEvent(
+        id,
+        'edited',
+        { reason: 'Deletion undone by the user.', after },
+        { actor: 'user' },
+      );
+      return after;
     })();
   }
 

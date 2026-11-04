@@ -1,309 +1,559 @@
-import { useCallback, useEffect, useState } from 'react';
-import { ArrowRight, BrainCircuit, Check, Database, RefreshCw, ShieldCheck } from 'lucide-react';
-import { z } from 'zod';
+import { useEffect, useState } from 'react';
+import { AnimatePresence, motion, MotionConfig } from 'framer-motion';
+import {
+  Activity,
+  ArrowRight,
+  ArrowUp,
+  BrainCircuit,
+  CalendarDays,
+  Check,
+  ChevronRight,
+  CircleHelp,
+  FileText,
+  Layers3,
+  Mail,
+  MessageSquare,
+  Moon,
+  Plus,
+  ShieldCheck,
+  Sparkles,
+  Sun,
+} from 'lucide-react';
+import { Toaster, toast } from 'sonner';
+import { api, emptySchema, jsonRequest } from './api';
+import { applyTheme, notifyError, usePreferences, useWorkspace, type View } from './store';
+import { PlanCard } from './components/PlanCard';
+import { MemoryPanel } from './components/MemoryPanel';
 
-const healthSchema = z.object({
-  status: z.literal('ok'),
-  database: z.literal('connected'),
-  mockMode: z.boolean(),
-  model: z.string(),
-});
-const memoriesSchema = z.object({
-  total: z.number(),
-  memories: z.array(
-    z.object({
-      id: z.string(),
-      type: z.string(),
-      value: z.string(),
-      confidence: z.number(),
-      source: z.enum(['seed', 'user', 'inferred']),
-    }),
-  ),
-});
-const errorSchema = z.object({ error: z.object({ message: z.string() }) });
-const seedSchema = z.object({ inserted: z.number(), total: z.number() });
-type Foundation = {
-  health: z.infer<typeof healthSchema>;
-  memories: z.infer<typeof memoriesSchema>;
-};
-
-async function fetchJson(path: string, options: RequestInit = {}): Promise<unknown> {
-  const response = await fetch(path, options);
-  const body: unknown = await response.json();
-  if (!response.ok) {
-    const parsed = errorSchema.safeParse(body);
-    throw new Error(
-      parsed.success ? parsed.data.error.message : 'The server could not complete this request.',
-    );
-  }
-  return body;
-}
+const navigation = [
+  { name: 'Sessions', icon: MessageSquare },
+  { name: 'Memory', icon: BrainCircuit },
+  { name: 'Calendar', icon: CalendarDays },
+  { name: 'Notes', icon: FileText },
+  { name: 'Drafts', icon: Mail },
+  { name: 'Audit', icon: Activity },
+] satisfies { name: View; icon: typeof Activity }[];
 
 export default function App() {
-  const [foundation, setFoundation] = useState<Foundation | null>(null);
-  const [loading, setLoading] = useState(true);
+  const state = useWorkspace();
+  const { theme, setTheme } = usePreferences();
+  const [goal, setGoal] = useState('');
   const [seeding, setSeeding] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState('');
-
-  const refresh = useCallback((signal?: AbortSignal): Promise<void> => {
-    const options = signal ? { signal } : {};
-    return Promise.all([fetchJson('/api/health', options), fetchJson('/api/memories', options)])
-      .then(([health, memories]) => {
-        if (!signal?.aborted) {
-          setFoundation({
-            health: healthSchema.parse(health),
-            memories: memoriesSchema.parse(memories),
-          });
-          setError(null);
-        }
-      })
-      .catch(() => {
-        if (!signal?.aborted) {
-          setError('Could not connect to LifeOS. Check that the server is running, then retry.');
-        }
-      })
-      .finally(() => {
-        if (!signal?.aborted) setLoading(false);
-      });
-  }, []);
-
   useEffect(() => {
-    const controller = new AbortController();
-    void refresh(controller.signal);
-    return () => controller.abort();
-  }, [refresh]);
+    void useWorkspace.getState().load();
+  }, []);
+  useEffect(() => {
+    const media = matchMedia('(prefers-color-scheme: dark)');
+    const update = () => applyTheme(theme);
+    update();
+    media.addEventListener('change', update);
+    return () => media.removeEventListener('change', update);
+  }, [theme]);
 
-  async function loadDemo(): Promise<void> {
+  async function seed(start = false) {
     setSeeding(true);
-    setError(null);
-    setNotice('');
     try {
-      const result = seedSchema.parse(
-        await fetchJson('/api/demo/seed', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: '{}',
-        }),
-      );
-      setNotice(
-        result.inserted > 0
-          ? `${result.inserted} demo memories added. Your foundation is ready.`
-          : 'Demo data is already loaded. Your existing memories are preserved.',
-      );
-      setLoading(true);
-      await refresh();
-    } catch (caught) {
-      setError(
-        caught instanceof Error ? caught.message : 'Could not load demo data. Please retry.',
-      );
+      await api('/demo/seed', emptySchema, jsonRequest({}));
+      await state.load();
+      if (start) await state.createPlan('Prepare for my Friday investor call.', true);
+      else toast.success('Demo context loaded.');
+    } catch (error) {
+      notifyError(error);
     } finally {
       setSeeding(false);
     }
   }
+  async function approveSafe() {
+    for (const step of state.active?.plan?.steps ?? [])
+      if (
+        step.status === 'proposed' &&
+        step.risk === 'low' &&
+        !step.policy_warnings.some((warning) => warning.blocking)
+      ) {
+        if (!(await state.review(step.id, 'approve'))) break;
+      }
+  }
+  const plan = state.active?.plan;
+  const approved =
+    plan?.steps.filter((step) => ['approved', 'edited'].includes(step.status)).length ?? 0;
+  const reviewed = plan?.steps.filter((step) => step.status !== 'proposed').length ?? 0;
 
   return (
-    <div className="min-h-screen px-5 py-8 sm:px-10">
-      <header className="mx-auto flex max-w-5xl items-center justify-between gap-4">
-        <a href="/" className="flex items-center gap-3 rounded-lg" aria-label="LifeOS home">
-          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent text-white">
-            <BrainCircuit size={23} aria-hidden="true" />
-          </span>
-          <span className="text-xl font-semibold tracking-tight">
-            LifeOS<span className="text-accent">.</span>
-          </span>
+    <MotionConfig reducedMotion="user">
+      <div className="app-shell">
+        <a href="#main-content" className="skip-link">
+          Skip to workspace
         </a>
-        <span className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600">
-          Phase 01 · Foundation
-        </span>
-      </header>
-
-      <main className="mx-auto max-w-5xl pb-12 pt-16 sm:pt-24">
-        <div className="max-w-2xl">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-accent">
-            Your work, remembered
-          </p>
-          <h1 className="mt-4 text-4xl font-semibold leading-tight tracking-tight sm:text-5xl">
-            A little context.
-            <br />A better way to work.
-          </h1>
-          <p className="mt-5 max-w-xl text-base leading-7 text-slate-600">
-            LifeOS is a personal work agent that remembers how you work. Start with a few
-            preferences, and build from there.
-          </p>
-        </div>
-
-        <ol
-          aria-label="The LifeOS agent loop"
-          className="my-9 flex flex-wrap items-center gap-x-4 gap-y-3 text-sm"
-        >
-          {['Remember', 'Plan', 'Ask', 'Act', 'Learn'].map((step, index) => (
-            <li key={step} className="flex items-center gap-4">
-              {index > 0 && <ArrowRight size={14} className="text-slate-400" aria-hidden="true" />}
-              <span className={index === 0 ? 'font-semibold text-accent' : 'text-slate-500'}>
-                {step}
-              </span>
-            </li>
-          ))}
-        </ol>
-
-        <div className="grid gap-6 lg:grid-cols-[1fr_1.65fr]">
-          <section
-            aria-labelledby="foundation-heading"
-            className="self-start rounded-2xl border border-slate-200 bg-white p-6 shadow-soft sm:p-7"
-          >
-            <div className="mb-6 flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-50 text-accent">
-              <Database size={22} aria-hidden="true" />
-            </div>
-            <h2 id="foundation-heading" className="text-lg font-semibold tracking-tight">
-              A place for your context
-            </h2>
-            <p className="mt-2 text-sm leading-6 text-slate-600">
-              Your memory service and local database are ready to check. Load five preferences to
-              explore the foundation.
-            </p>
-            <dl className="my-6 space-y-4 text-sm" aria-busy={loading}>
-              <div className="flex justify-between gap-3">
-                <dt className="text-slate-500">Database</dt>
-                <dd className="font-medium">
-                  {loading ? 'Checking…' : error ? 'Check connection' : 'Connected'}
-                </dd>
-              </div>
-              <div className="flex justify-between gap-3">
-                <dt className="text-slate-500">Model mode</dt>
-                <dd className="font-medium">
-                  {foundation
-                    ? foundation.health.mockMode
-                      ? 'Mock · offline'
-                      : 'Live · configured'
-                    : '—'}
-                </dd>
-              </div>
-              <div className="flex justify-between gap-3">
-                <dt className="text-slate-500">Active memories</dt>
-                <dd className="font-medium tabular-nums">{foundation?.memories.total ?? '—'}</dd>
-              </div>
-            </dl>
-            <button
-              type="button"
-              onClick={() => {
-                void loadDemo();
-              }}
-              disabled={loading || seeding}
-              className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-accent px-4 py-3 text-sm font-semibold text-white disabled:opacity-60"
-            >
-              {seeding ? 'Loading demo data…' : 'Load demo data'}
-              {!seeding && <ArrowRight size={16} aria-hidden="true" />}
-            </button>
-            <p className="mt-3 text-center text-xs leading-5 text-slate-500">
-              Safe to load again. Existing memories are preserved.
-            </p>
-          </section>
-
-          <section
-            aria-labelledby="memories-heading"
-            className="rounded-2xl border border-slate-200 bg-white p-6 shadow-soft sm:p-7"
-          >
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <h2 id="memories-heading" className="text-lg font-semibold tracking-tight">
-                  What I know about you
-                </h2>
-                <p className="mt-1 text-sm text-slate-500">A read-only preview of your memory.</p>
-              </div>
+        <aside className="sidebar">
+          <a href="/" className="brand">
+            <span className="brand-mark">
+              <BrainCircuit size={22} />
+            </span>
+            <span className="sidebar-label">
+              LifeOS<span className="text-accent">.</span>
+            </span>
+          </a>
+          <div className="workspace-label sidebar-label">PERSONAL WORKSPACE</div>
+          <nav aria-label="Main navigation">
+            {navigation.map(({ name, icon: Icon }) => (
               <button
-                type="button"
-                onClick={() => {
-                  setLoading(true);
-                  void refresh();
-                }}
-                disabled={loading || seeding}
-                aria-label="Refresh memory preview"
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-200 text-slate-600 disabled:opacity-50"
+                key={name}
+                className={`nav-item ${state.view === name ? 'active' : ''}`}
+                aria-current={state.view === name ? 'page' : undefined}
+                title={name}
+                onClick={() => state.setView(name)}
               >
-                <RefreshCw size={17} aria-hidden="true" />
+                <Icon size={18} />
+                <span className="sidebar-label">{name}</span>
+                {name === 'Memory' && (
+                  <span className="sidebar-label nav-count">{state.memories.length}</span>
+                )}
+              </button>
+            ))}
+          </nav>
+          <div className="sidebar-label mt-9">
+            <div className="flex items-center justify-between px-3">
+              <h2 className="eyebrow">Recent sessions</h2>
+              <button
+                className="icon-button compact"
+                aria-label="New session"
+                onClick={() => {
+                  useWorkspace.setState({ active: null, view: 'Sessions' });
+                  document.getElementById('goal-input')?.focus();
+                }}
+              >
+                <Plus size={14} />
               </button>
             </div>
-
-            {loading && !foundation ? (
-              <div role="status" className="mt-7 space-y-4">
-                <p className="text-sm text-slate-500">Checking your foundation…</p>
-                {[1, 2, 3].map((key) => (
-                  <div key={key} className="h-16 rounded-xl bg-slate-100" aria-hidden="true" />
-                ))}
+            <div className="mt-2 space-y-1">
+              {state.sessions.slice(0, 6).map((session) => (
+                <button
+                  key={session.id}
+                  title={session.goal_text}
+                  className={`session-link ${state.active?.session.id === session.id ? 'active' : ''}`}
+                  onClick={() => {
+                    void state.selectSession(session.id);
+                  }}
+                >
+                  <span className="session-dot" />
+                  <span className="truncate">{session.goal_text}</span>
+                </button>
+              ))}
+              {state.sessions.length === 0 && (
+                <p className="px-3 py-3 text-xs leading-5 text-muted">Your plans will live here.</p>
+              )}
+            </div>
+          </div>
+          <div className="sidebar-bottom">
+            <div className="demo-context sidebar-label">
+              <Sparkles size={17} className="text-accent" />
+              <p className="mt-2 text-xs font-semibold">Make it feel like you.</p>
+              <p className="my-2 text-[11px] leading-5 text-muted">
+                Start with five everyday work preferences.
+              </p>
+              <button
+                className="button small w-full justify-center"
+                disabled={seeding}
+                onClick={() => {
+                  void seed();
+                }}
+              >
+                Load demo data
+              </button>
+            </div>
+            <div className="profile">
+              <span className="avatar">Y</span>
+              <div className="sidebar-label">
+                <strong className="block text-xs">Your workspace</strong>
+                <span className="text-[10px] text-muted">Private · stored locally</span>
               </div>
-            ) : foundation && foundation.memories.total > 0 ? (
-              <ul className="mt-5 divide-y divide-slate-100" aria-busy={loading}>
-                {foundation.memories.memories.map((memory) => (
-                  <li key={memory.id} className="py-4 first:pt-0 last:pb-0">
-                    <div className="flex items-start gap-3">
-                      <Check size={16} className="mt-1 shrink-0 text-accent" aria-hidden="true" />
-                      <p className="break-words text-sm font-medium leading-6">{memory.value}</p>
-                    </div>
-                    <div className="ml-7 mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                      <span className="rounded-md bg-slate-100 px-2 py-1 capitalize">
-                        {memory.type}
-                      </span>
-                      <span>
-                        {memory.source === 'seed'
-                          ? 'Demo seed'
-                          : memory.source === 'user'
-                            ? 'You'
-                            : 'Inferred'}
-                      </span>
-                      <span aria-hidden="true">·</span>
-                      <span>{Math.round(memory.confidence * 100)}% confidence</span>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <div className="my-10 rounded-xl border border-dashed border-slate-200 px-5 py-9 text-center">
-                <BrainCircuit
-                  size={28}
-                  className="mx-auto mb-3 text-slate-400"
-                  aria-hidden="true"
-                />
-                <h3 className="text-sm font-medium">A fresh start</h3>
-                <p className="mx-auto mt-2 max-w-xs text-sm leading-6 text-slate-500">
-                  Load the demo preferences to see the context LifeOS will use to plan with you.
+            </div>
+          </div>
+        </aside>
+
+        <div className="main-shell">
+          <header className="topbar">
+            <div className="flex items-center gap-2 text-sm">
+              <span className="text-muted">Workspace</span>
+              <ChevronRight size={13} className="text-muted" />
+              <strong className="font-medium">{state.view}</strong>
+            </div>
+            <div className="flex items-center gap-3">
+              <span
+                className={`mode-badge ${state.health?.mockMode ? 'mock' : ''}`}
+                title={state.health?.model ?? 'Connecting'}
+              >
+                {!state.health
+                  ? 'CONNECTING'
+                  : state.health.mockMode
+                    ? 'MOCK · SIMULATED'
+                    : 'LIVE MODEL'}
+              </span>
+              <button
+                className="icon-button"
+                aria-label={`Theme: ${theme}. Switch theme`}
+                title={`Theme: ${theme}`}
+                onClick={() =>
+                  setTheme(theme === 'system' ? 'dark' : theme === 'dark' ? 'light' : 'system')
+                }
+              >
+                {theme === 'dark' ? <Moon size={17} /> : <Sun size={17} />}
+              </button>
+            </div>
+          </header>
+
+          <main id="main-content" className="main-content">
+            <div className="page-heading">
+              <div>
+                <p className="eyebrow text-accent">A little context. A better plan.</p>
+                <h1>
+                  {state.view === 'Sessions'
+                    ? 'Make room for what matters.'
+                    : state.view === 'Memory'
+                      ? 'Your context, in your control.'
+                      : state.view}
+                </h1>
+                <p className="text-sm text-muted">
+                  {state.view === 'Sessions'
+                    ? 'Tell me the outcome. We’ll work out the steps together.'
+                    : 'Everything stays in your local workspace.'}
                 </p>
               </div>
-            )}
-          </section>
-        </div>
+              <span className="trust-indicator">
+                <ShieldCheck size={15} />
+                Nothing runs without your approval
+              </span>
+            </div>
 
-        <div aria-live="polite" role="status" className="mt-5 text-sm leading-6 text-slate-600">
-          {notice}
-        </div>
-        {error && (
-          <div
-            role="alert"
-            className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900"
-          >
-            <p>{error}</p>
-            <button
-              type="button"
-              onClick={() => {
-                setLoading(true);
-                void refresh();
+            <form
+              className="command-bar"
+              onSubmit={(event) => {
+                event.preventDefault();
+                if (goal.trim().length >= 3) {
+                  void state.createPlan(goal.trim());
+                  setGoal('');
+                }
               }}
-              disabled={loading}
-              className="min-h-11 rounded-lg px-3 font-semibold underline underline-offset-4"
             >
-              Retry connection
-            </button>
-          </div>
-        )}
+              <Sparkles size={21} className="shrink-0 text-accent" />
+              <label htmlFor="goal-input" className="sr-only">
+                What do you want to get done?
+              </label>
+              <input
+                id="goal-input"
+                value={goal}
+                onChange={(event) => setGoal(event.target.value)}
+                maxLength={2000}
+                placeholder="What do you want to get done?"
+                autoComplete="off"
+                disabled={state.planning}
+              />
+              <span className="hidden text-xs text-muted xl:inline">
+                Remember → Plan → Ask → Act → Learn
+              </span>
+              <button
+                className="command-submit"
+                aria-label="Create a plan"
+                disabled={goal.trim().length < 3 || state.planning}
+              >
+                <ArrowUp size={19} />
+              </button>
+            </form>
 
-        <footer className="mt-9 flex flex-col justify-between gap-4 border-t border-slate-200 pt-6 text-xs leading-5 text-slate-500 sm:flex-row">
-          <p className="flex items-center gap-2">
-            <ShieldCheck size={16} className="shrink-0 text-accent" aria-hidden="true" />
-            Nothing runs without your approval.
-          </p>
-          <p>Phase 1: memory + API. Planning arrives in Phase 2.</p>
-        </footer>
-      </main>
-    </div>
+            {state.view === 'Memory' ? (
+              <MemoryPanel expanded />
+            ) : state.view !== 'Sessions' ? (
+              <div className="empty-state">
+                <Layers3 size={32} />
+                <h2>Your local {state.view.toLowerCase()}</h2>
+                <p>This view will display approved local tool results in Phase 4.</p>
+              </div>
+            ) : (
+              <div className="workspace-grid">
+                <section className="goal-panel" aria-labelledby="goal-title">
+                  <div className="panel-heading">
+                    <h2 id="goal-title">The conversation</h2>
+                    <MessageSquare size={16} className="text-muted" />
+                  </div>
+                  {state.active ? (
+                    <>
+                      <div className="goal-message">
+                        <span className="avatar small">Y</span>
+                        <div>
+                          <p className="mb-1 text-[11px] font-medium text-muted">You</p>
+                          <p className="text-sm leading-6">{state.active.session.goal_text}</p>
+                        </div>
+                      </div>
+                      <div className="agent-message">
+                        <span className="mini-brand">
+                          <BrainCircuit size={16} />
+                        </span>
+                        <div>
+                          <p className="mb-2 text-[11px] font-semibold">LifeOS</p>
+                          <p className="text-[13px] leading-6 text-muted">
+                            {plan
+                              ? `I brought ${state.active.memories.length} memories into this plan. Take a look and make it yours.`
+                              : 'This session did not produce a plan. You can retry your goal above.'}
+                          </p>
+                        </div>
+                      </div>
+                      {state.active.session.demo_scenario && (
+                        <div className="demo-note">
+                          <Sparkles size={15} />
+                          <p>
+                            Guided demo. Contacts and meeting details are fictional. The first early
+                            proposal is deliberately staged.
+                          </p>
+                        </div>
+                      )}
+                      {plan && (
+                        <div className="loop-list">
+                          {['Remember', 'Plan', 'Ask', 'Act', 'Learn'].map((name, index) => (
+                            <div key={name} className={index < 3 ? 'done' : ''}>
+                              <span>{index < 2 ? <Check size={12} /> : index + 1}</span>
+                              <p>{name}</p>
+                              {index === 2 && <small>YOUR TURN</small>}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {plan && plan.questions_for_user.length > 0 && (
+                        <div className="questions">
+                          <h3 className="flex items-center gap-2 text-xs font-semibold">
+                            <CircleHelp size={14} />A little more context?
+                          </h3>
+                          <ul className="mt-2 space-y-2">
+                            {plan.questions_for_user.map((question) => (
+                              <li key={question} className="text-xs leading-5 text-muted">
+                                {question}
+                              </li>
+                            ))}
+                          </ul>
+                          <p className="mt-3 text-[11px] text-muted">
+                            Include your answers in your next goal.
+                          </p>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="goal-intro">
+                      <span className="mini-brand mb-4">
+                        <BrainCircuit size={19} />
+                      </span>
+                      <h3 className="text-sm font-semibold">A collaborator with context.</h3>
+                      <p className="mt-3 text-[13px] leading-6 text-muted">
+                        I remember the small things—how you write, when you focus, what matters
+                        next.
+                      </p>
+                      <p className="mt-3 text-[13px] leading-6 text-muted">
+                        You decide what happens. I learn from each decision.
+                      </p>
+                      <div className="mt-6 border-t border-line pt-4">
+                        <span className="eyebrow">Try a goal</span>
+                        {[
+                          'Prepare for my Friday investor call.',
+                          "Get ready for next week's board meeting.",
+                        ].map((example) => (
+                          <button
+                            key={example}
+                            className="example-goal"
+                            onClick={() => {
+                              setGoal(example);
+                              document.getElementById('goal-input')?.focus();
+                            }}
+                          >
+                            {example}
+                            <ArrowRight size={14} />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </section>
+
+                <section className="plan-panel" aria-labelledby="plan-title">
+                  <div className="panel-heading">
+                    <div className="flex items-center gap-2">
+                      <h2 id="plan-title">Plan & approvals</h2>
+                      {plan && <span className="count-badge">v{plan.version}</span>}
+                    </div>
+                    <span className="text-[11px] tabular-nums text-muted">
+                      {plan ? `${reviewed}/${plan.steps.length} reviewed` : 'Built around you'}
+                    </span>
+                  </div>
+                  <AnimatePresence mode="wait">
+                    {state.planning ? (
+                      <motion.div
+                        key="planning"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.18 }}
+                        className="planning-state"
+                        role="status"
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="mini-brand">
+                            <BrainCircuit size={20} />
+                          </span>
+                          <div>
+                            <h3 className="text-sm font-semibold">Putting your context to work</h3>
+                            <p className="mt-1 text-xs text-muted">Waiting for a validated plan</p>
+                          </div>
+                        </div>
+                        <ol className="my-6 space-y-4">
+                          {['Recalling memories…', 'Planning…', 'Checking your preferences…'].map(
+                            (label, index) => (
+                              <li
+                                key={label}
+                                className="flex items-center gap-3 text-sm text-muted"
+                              >
+                                <span className="count-badge">{index + 1}</span>
+                                {label}
+                              </li>
+                            ),
+                          )}
+                        </ol>
+                        {[1, 2].map((index) => (
+                          <div key={index} className="skeleton-card" aria-hidden="true">
+                            <div />
+                            <div />
+                            <div />
+                          </div>
+                        ))}
+                      </motion.div>
+                    ) : plan ? (
+                      <motion.div
+                        key={plan.id}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ duration: 0.18 }}
+                      >
+                        <p className="mb-5 text-sm leading-6 text-muted">{plan.summary}</p>
+                        {plan.mode === 'fallback' && (
+                          <div className="warning-box mb-4 rounded-xl p-3 text-xs">
+                            Live model unavailable. This plan uses an explicitly enabled simulated
+                            fallback.
+                          </div>
+                        )}
+                        {plan.changed_since_last_time.length > 0 && (
+                          <div className="change-summary">
+                            <h3 className="flex items-center gap-2 text-xs font-semibold">
+                              <Sparkles size={14} />
+                              Changed since last time
+                            </h3>
+                            {plan.changed_since_last_time.map((change) => (
+                              <p key={change.memory_id} className="mt-2 text-xs leading-5">
+                                {change.key.replaceAll('_', ' ')} · {change.reason}
+                              </p>
+                            ))}
+                          </div>
+                        )}
+                        <div className="space-y-4">
+                          {plan.steps.map((step) => (
+                            <PlanCard
+                              key={step.id}
+                              step={step}
+                              locked={state.active?.session.status === 'reflected'}
+                            />
+                          ))}
+                        </div>
+                        {plan.steps.length === 0 && (
+                          <div className="empty-small">
+                            <CircleHelp size={24} />
+                            <p>Answer the questions to make a more specific plan.</p>
+                          </div>
+                        )}
+                        <div className="approval-footer">
+                          <p className="mb-3 flex items-center gap-2 text-[11px] text-muted">
+                            <ShieldCheck size={13} />
+                            Local simulations only. No emails are sent.
+                          </p>
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              className="button"
+                              disabled={
+                                state.pending.length > 0 ||
+                                !plan.steps.some(
+                                  (step) =>
+                                    step.status === 'proposed' &&
+                                    step.risk === 'low' &&
+                                    !step.policy_warnings.some((warning) => warning.blocking),
+                                )
+                              }
+                              onClick={() => {
+                                void approveSafe();
+                              }}
+                            >
+                              Approve all safe steps
+                            </button>
+                            <button
+                              className="button primary ml-auto"
+                              disabled
+                              title="Local execution is implemented in Phase 4"
+                            >
+                              Run approved ({approved})<ArrowRight size={14} />
+                            </button>
+                          </div>
+                        </div>
+                      </motion.div>
+                    ) : (
+                      <div className="plan-empty">
+                        <div className="empty-art">
+                          <BrainCircuit size={34} />
+                          <span className="art-dot one" />
+                          <span className="art-dot two" />
+                          <span className="art-dot three" />
+                        </div>
+                        <span className="eyebrow text-accent">YOUR NEXT STEP, WITH CONTEXT</span>
+                        <h2>
+                          A plan that starts
+                          <br />
+                          with knowing you.
+                        </h2>
+                        <p>
+                          Give me a goal. I’ll recall what matters, propose a few useful steps, and
+                          ask before taking action.
+                        </p>
+                        <button
+                          className="button primary mt-7"
+                          disabled={seeding || state.planning}
+                          onClick={() => {
+                            void seed(true);
+                          }}
+                        >
+                          <Sparkles size={15} />
+                          Start guided demo
+                          <ArrowRight size={14} />
+                        </button>
+                        <span className="mt-3 block text-[11px] text-muted">
+                          Fictional investor-call scenario · about 2 minutes
+                        </span>
+                      </div>
+                    )}
+                  </AnimatePresence>
+                </section>
+                <MemoryPanel />
+              </div>
+            )}
+          </main>
+          <footer className="app-footer">
+            <span>
+              <span className="online-dot" />
+              {state.health ? 'Local database connected' : 'Connecting to your workspace'}
+            </span>
+            <span>
+              Built for your world. <span className="ml-2">All times UTC</span>
+            </span>
+          </footer>
+        </div>
+      </div>
+      <Toaster
+        theme={theme}
+        position="bottom-right"
+        closeButton
+        toastOptions={{ style: { fontFamily: 'Inter, sans-serif' } }}
+      />
+    </MotionConfig>
   );
 }

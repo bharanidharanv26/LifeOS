@@ -119,6 +119,21 @@ describe('Phase 1 REST API', () => {
     expect(fixture.memories.list().total).toBe(1);
   });
 
+  it('undoes deletion with the same identity, confidence, and confirmation history', async () => {
+    const memory = fixture.memories.addMemory({ ...memoryInput, type: 'preference' });
+    fixture.memories.reinforce(memory.id);
+    await request(fixture.app).delete(`/api/memories/${memory.id}`).expect(200);
+    const restored = await request(fixture.app)
+      .post(`/api/memories/${memory.id}/restore`)
+      .send({})
+      .expect(200);
+    expect(restored.body).toMatchObject({
+      memory: { id: memory.id, confidence: 0.9, times_confirmed: 1 },
+    });
+    await request(fixture.app).post(`/api/memories/${memory.id}/restore`).send({}).expect(409);
+    expect(fixture.memories.history(memory.id)[0]?.detail).toContain('Deletion undone');
+  });
+
   it('seeds idempotently and exposes memory-aware retrieval explanations', async () => {
     expect((await request(fixture.app).post('/api/demo/seed').send({}).expect(200)).body).toEqual({
       inserted: 5,

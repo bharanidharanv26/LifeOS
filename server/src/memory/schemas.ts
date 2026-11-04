@@ -46,6 +46,18 @@ export const editMemorySchema = z
   });
 
 export const memoryIdSchema = z.uuid();
+export const memorySnapshotSchema = z
+  .object({
+    ...memoryFields,
+    id: z.uuid(),
+    times_confirmed: z.number().int().nonnegative(),
+    times_contradicted: z.number().int().nonnegative(),
+    created_at: z.iso.datetime(),
+    updated_at: z.iso.datetime(),
+    last_used_at: z.iso.datetime().nullable(),
+    archived: z.boolean(),
+  })
+  .strict();
 export const listMemoriesSchema = z
   .object({
     type: z.enum(memoryTypes).optional(),

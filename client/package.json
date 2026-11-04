@@ -15,6 +15,8 @@
     "lucide-react": "^0.468.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "sonner": "^2.0.7",
+    "@base-ui/react": "^1.0.0",
     "zustand": "^5.0.8",
     "zod": "^4.6.7"
   },
