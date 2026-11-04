@@ -126,7 +126,9 @@ describe('planning and policy', () => {
       .expect(200);
     expect(agent.getStep(step.id).status).toBe('rejected');
     await request(fixture.app).get(`/api/sessions/${result.session.id}`).expect(200);
-    await request(fixture.app).get('/api/llm-calls').expect(200);
+    const calls = (await request(fixture.app).get('/api/llm-calls').expect(200)).body.calls;
+    expect(calls.length).toBeGreaterThanOrEqual(2);
+    expect(calls[0]).toMatchObject({ purpose: 'plan', mode: 'mock', ok: 1 });
     expect(
       fixture.db
         .prepare("SELECT count(*) AS count FROM audit_log WHERE action='step.reject'")

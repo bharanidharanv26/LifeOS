@@ -1,6 +1,6 @@
 # LifeOS phase gates
 
-Phases 1–5 are implemented. Every phase passes `npm run check` before the next begins.
+Phases 1–6 are implemented. Every phase passes `npm run check` before the next begins.
 
 ## Phase 1 — Foundation
 
@@ -70,9 +70,14 @@ Expected: every check passes; `http://localhost:5173` shows a connected database
 
 ## Phase 6 — Interaction polish
 
-- Motion, empty states, review shortcuts, accessibility, and onboarding.
-- Model activity drawer and progress stages.
-- Demo-script helper panel.
+**Complete. Gate: `npm run check` passed; 52 tests.**
+
+- [x] Three-step onboarding on first run, reopenable from the help button. It never blocks the workspace and can start the guided demo directly.
+- [x] Keyboard shortcuts on the selected step: `A` approve, `E` edit, `R` reject. They are ignored while typing, in dialogs, and outside Sessions.
+- [x] Model activity drawer fed by `GET /api/llm-calls`: purpose, mode, model, latency, tokens, retries, outcome, and timestamp. Prompts and keys are never exposed.
+- [x] Demo-script drawer with the exact two-minute sequence plus one-click "Load demo data" and "Start guided demo".
+- [x] Accessibility pass: live region for planning/execution/learning state, shortcut hints, labeled dialogs with Escape close and initial focus, visible focus rings, reduced motion.
+- [x] Responsive topbar and drawers down to 360px; no hover-only affordances.
 
 ## Phase 7 — Release readiness
 

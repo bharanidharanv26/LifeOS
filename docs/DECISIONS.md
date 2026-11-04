@@ -32,3 +32,13 @@
 - A memory is never weakened merely because a proposal violated it—only an explicit rejection or contradiction does that.
 - The learned diff shows new, reinforced, and weakened memories with before/after confidence. The plan comparator shows v1 and v2 side by side and highlights steps citing changed memories.
 - In mock mode, the second demo goal ("Get ready for next week's board meeting.") deterministically shows the learned noon preference and the edited email structure. The learned card offers that next goal in one click.
+
+## Phase 6
+
+- Onboarding is three sentences, not a product tour. It persists a single local flag, can be reopened from help, and never covers the workspace after dismissal. "Start guided demo" seeds context and creates the demo plan in one click.
+- Shortcuts act only on the selected step in the Sessions view. They are suppressed while an input, select, or contenteditable has focus and whenever any dialog is open, so typing "a" can never approve something.
+- Keys are dispatched as a custom event from the shell; each plan card listens only for its own step ID. This keeps the shortcut logic out of the card's mouse handlers and avoids duplicating keyboard behavior.
+- The model activity drawer shows operational metadata only — never prompts, memory contents, or credentials. Mock calls are displayed with the same prominence as live calls, which makes the simulation mode impossible to hide.
+- The demo script is a static drawer, not generated content, so the runbook cannot drift from what the seeded fixture actually does. Buttons remount the same seed path the onboarding uses.
+- Screens announce planning, execution, and learning through one polite live region instead of dozens of focus moves. Dialogs take initial focus and close on Escape; focus rings are global; reduced-motion rules already disable motion and now cover drawer and onboarding transitions.
+- On small screens the breadcrumb is dropped before any action button, and icon buttons grow to 40px targets. Mode badges remain visible at all widths.

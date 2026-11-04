@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   AlertTriangle,
   CalendarDays,
@@ -91,6 +91,22 @@ export function PlanCard({ step, locked }: { step: Step; locked: boolean }) {
   async function submitReject() {
     if (await review(step.id, 'reject', { reason })) setForm(null);
   }
+  useEffect(() => {
+    const onAction = (event: Event) => {
+      const detail = (event as CustomEvent<{ stepId: string; action: string }>).detail;
+      if (detail.stepId !== step.id || form) return;
+      if (detail.action === 'approve' && !blocked && !finished && !busy) {
+        void review(step.id, 'approve');
+      }
+      if (detail.action === 'edit' && !finished) {
+        setDraft(step.edited_args ?? step.args);
+        setForm('edit');
+      }
+      if (detail.action === 'reject' && !finished) setForm('reject');
+    };
+    window.addEventListener('lifeos:step-action', onAction);
+    return () => window.removeEventListener('lifeos:step-action', onAction);
+  }, [step, form, blocked, finished, busy, review]);
 
   return (
     <article

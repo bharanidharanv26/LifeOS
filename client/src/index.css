@@ -978,6 +978,99 @@
   .skip-link:focus {
     top: 10px;
   }
+  .shortcut-hint {
+    margin-top: 10px;
+    font-size: 10px;
+    color: rgb(var(--muted));
+  }
+  .shortcut-hint kbd {
+    display: inline-flex;
+    min-width: 18px;
+    height: 18px;
+    align-items: center;
+    justify-content: center;
+    padding: 0 4px;
+    border: 1px solid rgb(var(--line));
+    border-radius: 5px;
+    background: rgb(var(--soft));
+    font-family: inherit;
+    font-size: 9px;
+    font-weight: 600;
+  }
+  .drawer-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    background: rgb(16 18 25 / 0.42);
+    backdrop-filter: blur(3px);
+  }
+  .drawer {
+    position: fixed;
+    inset-block: 0;
+    right: 0;
+    z-index: 61;
+    display: flex;
+    width: min(420px, 100%);
+    flex-direction: column;
+    border-left: 1px solid rgb(var(--line));
+    background: rgb(var(--panel));
+    box-shadow: -18px 0 40px rgb(16 18 25 / 0.12);
+  }
+  .drawer-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    border-bottom: 1px solid rgb(var(--line));
+    padding: 20px;
+  }
+  .drawer-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+  }
+  .call-row {
+    border: 1px solid rgb(var(--line));
+    border-radius: 10px;
+    padding: 10px 12px;
+    background: rgb(var(--soft) / 0.5);
+  }
+  .onboarding-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 70;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: rgb(16 18 25 / 0.48);
+    backdrop-filter: blur(4px);
+  }
+  .onboarding-card {
+    width: min(480px, 100%);
+    border: 1px solid rgb(var(--line));
+    border-radius: 16px;
+    background: rgb(var(--panel));
+    padding: 24px;
+    box-shadow: 0 24px 80px rgb(16 18 25 / 0.28);
+  }
+  .onboarding-dots {
+    display: flex;
+    gap: 6px;
+  }
+  .onboarding-dots button {
+    width: 22px;
+    min-height: 0;
+    height: 5px;
+    padding: 0;
+    border: none;
+    border-radius: 999px;
+    background: rgb(var(--line));
+    cursor: pointer;
+  }
+  .onboarding-dots button.active {
+    background: rgb(var(--accent));
+  }
 }
 @media (hover: hover) and (pointer: fine) {
   .button:not(.primary):not(:disabled):hover,
@@ -1098,7 +1191,10 @@
     padding: 0 16px;
   }
   .topbar > div:first-child {
-    font-size: 11px;
+    display: none;
+  }
+  .topbar .icon-button {
+    width: 40px;
   }
   .mode-badge {
     font-size: 7px;
@@ -1125,6 +1221,12 @@
   }
   .plan-empty {
     padding: 35px 20px;
+  }
+  .drawer {
+    width: 100%;
+  }
+  .onboarding-card {
+    padding: 20px;
   }
 }
 @media (prefers-reduced-motion: reduce) {

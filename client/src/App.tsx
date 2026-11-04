@@ -13,6 +13,7 @@ import {
   Mail,
   MessageSquare,
   Moon,
+  Play,
   Plus,
   ShieldCheck,
   Sparkles,
@@ -25,6 +26,8 @@ import { PlanCard } from './components/PlanCard';
 import { MemoryPanel } from './components/MemoryPanel';
 import { LearnedCard } from './components/LearnedCard';
 import { PlanComparison } from './components/PlanComparison';
+import { Onboarding } from './components/Onboarding';
+import { DemoDrawer, ModelDrawer } from './components/Drawers';
 import { CalendarView } from './components/CalendarView';
 import { NotesView } from './components/NotesView';
 import { DraftsView } from './components/DraftsView';
@@ -44,9 +47,51 @@ export default function App() {
   const { theme, setTheme } = usePreferences();
   const [goal, setGoal] = useState('');
   const [seeding, setSeeding] = useState(false);
+  const [modelOpen, setModelOpen] = useState(false);
+  const [demoOpen, setDemoOpen] = useState(false);
+  const [onboarding, setOnboarding] = useState(() => {
+    try {
+      return !localStorage.getItem('lifeos-onboarded');
+    } catch {
+      return true;
+    }
+  });
   useEffect(() => {
     void useWorkspace.getState().load();
   }, []);
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return;
+      if (document.querySelector('[role="dialog"]')) return;
+      const target = event.target as HTMLElement | null;
+      if (target?.closest('input,textarea,select,[contenteditable="true"]')) return;
+      if (useWorkspace.getState().view !== 'Sessions') return;
+      const stepId = useWorkspace.getState().selectedStepId;
+      if (!stepId) return;
+      const key = event.key.toLowerCase();
+      if (!['a', 'e', 'r'].includes(key)) return;
+      event.preventDefault();
+      window.dispatchEvent(
+        new CustomEvent('lifeos:step-action', {
+          detail: {
+            stepId,
+            action: key === 'a' ? 'approve' : key === 'e' ? 'edit' : 'reject',
+          },
+        }),
+      );
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+  function finishOnboarding(start = false) {
+    try {
+      localStorage.setItem('lifeos-onboarded', '1');
+    } catch {
+      /* Onboarding still closes when storage is unavailable. */
+    }
+    setOnboarding(false);
+    if (start) void seed(true);
+  }
   useEffect(() => {
     const media = matchMedia('(prefers-color-scheme: dark)');
     const update = () => applyTheme(theme);
@@ -185,7 +230,31 @@ export default function App() {
               <ChevronRight size={13} className="text-muted" />
               <strong className="font-medium">{state.view}</strong>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <button
+                className="icon-button"
+                aria-label="How LifeOS works"
+                title="How it works"
+                onClick={() => setOnboarding(true)}
+              >
+                <CircleHelp size={17} />
+              </button>
+              <button
+                className="icon-button"
+                aria-label="Open demo script"
+                title="Demo script"
+                onClick={() => setDemoOpen(true)}
+              >
+                <Play size={16} />
+              </button>
+              <button
+                className="icon-button"
+                aria-label="Open model activity"
+                title="Model activity"
+                onClick={() => setModelOpen(true)}
+              >
+                <Activity size={17} />
+              </button>
               <span
                 className={`mode-badge ${state.health?.mockMode ? 'mock' : ''}`}
                 title={state.health?.model ?? 'Connecting'}
@@ -210,6 +279,17 @@ export default function App() {
           </header>
 
           <main id="main-content" className="main-content">
+            <p className="sr-only" role="status" aria-live="polite">
+              {state.planning
+                ? 'Planning your next steps.'
+                : state.executing
+                  ? 'Running approved local actions.'
+                  : state.reflecting
+                    ? 'Learning from your reviews.'
+                    : plan
+                      ? `Plan version ${plan.version} ready. ${reviewed} of ${plan.steps.length} steps reviewed.`
+                      : ''}
+            </p>
             <div className="page-heading">
               <div>
                 <p className="eyebrow text-accent">A little context. A better plan.</p>
@@ -584,6 +664,10 @@ export default function App() {
                                 : 'Turns approvals, edits, and rejection reasons into preferences.'}
                             </span>
                           </div>
+                          <p className="shortcut-hint">
+                            Selected step: <kbd>A</kbd> approve · <kbd>E</kbd> edit · <kbd>R</kbd>{' '}
+                            reject
+                          </p>
                         </div>
                       </motion.div>
                     ) : (
@@ -637,6 +721,26 @@ export default function App() {
           </footer>
         </div>
       </div>
+      <Onboarding
+        open={onboarding}
+        busy={seeding}
+        onClose={() => finishOnboarding()}
+        onStartDemo={() => finishOnboarding(true)}
+      />
+      <ModelDrawer open={modelOpen} onClose={() => setModelOpen(false)} />
+      <DemoDrawer
+        open={demoOpen}
+        seeding={seeding}
+        onClose={() => setDemoOpen(false)}
+        onSeed={() => {
+          setDemoOpen(false);
+          void seed(false);
+        }}
+        onStart={() => {
+          setDemoOpen(false);
+          void seed(true);
+        }}
+      />
       <Toaster
         theme={theme}
         position="bottom-right"
