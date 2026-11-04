@@ -762,6 +762,54 @@
   .skeleton-card div:nth-child(3) {
     width: 70%;
   }
+  .learned-card {
+    padding: 18px;
+    border: 1px solid rgb(var(--accent) / 0.25);
+    border-radius: 16px;
+    background: rgb(var(--accent) / 0.035);
+  }
+  .learned-memory {
+    padding: 12px;
+    border: 1px solid rgb(var(--accent) / 0.15);
+    border-radius: 10px;
+    background: rgb(var(--panel));
+  }
+  .plan-compare {
+    padding: 14px;
+    border: 1px solid rgb(var(--line));
+    border-radius: 14px;
+    background: rgb(var(--panel));
+  }
+  .plan-compare summary {
+    list-style: none;
+    cursor: pointer;
+    color: rgb(var(--muted));
+  }
+  .plan-compare summary::-webkit-details-marker {
+    display: none;
+  }
+  .compare-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+  .compare-column {
+    min-width: 0;
+    padding: 12px;
+    border: 1px solid rgb(var(--line));
+    border-radius: 10px;
+    background: rgb(var(--canvas));
+  }
+  .compare-step {
+    padding: 8px;
+    border: 1px solid transparent;
+    border-radius: 7px;
+    background: rgb(var(--panel));
+  }
+  .compare-step.changed-step {
+    border-color: rgb(var(--accent) / 0.3);
+    background: rgb(var(--accent) / 0.055);
+  }
   .library-view {
     max-width: 1100px;
   }
@@ -1028,6 +1076,9 @@
   }
 }
 @media (max-width: 680px) {
+  .compare-grid {
+    grid-template-columns: 1fr;
+  }
   .workspace-grid {
     grid-template-columns: minmax(0, 1fr);
   }

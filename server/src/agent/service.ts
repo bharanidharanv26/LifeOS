@@ -3,7 +3,7 @@ import { z } from 'zod';
 import type { LifeDatabase } from '../db/index.js';
 import { AppError } from '../errors.js';
 import type { LlmClient } from '../llm/client.js';
-import { PLAN_PROMPT, UNDERSTAND_PROMPT } from '../llm/prompts.js';
+import { PLAN_PROMPT, REFLECT_PROMPT, UNDERSTAND_PROMPT } from '../llm/prompts.js';
 import { nextWeekday } from '../llm/mock.js';
 import { MemoryService, type Clock } from '../memory/service.js';
 import type { Memory } from '../memory/schemas.js';
@@ -14,6 +14,7 @@ import {
   planSchema,
   policyWarningSchema,
   stepStatusSchema,
+  reflectionSchema,
   understandSchema,
   type StoredStep,
 } from './schemas.js';
@@ -55,6 +56,26 @@ interface StepRow {
   result_json: string | null;
   policy_json: string;
   demo_fixture: number;
+}
+export interface LearnedPayload {
+  new_memories: (Memory & { evidence_step_ids: string[] })[];
+  reinforced: {
+    id: string;
+    key: string;
+    value: string;
+    confidence_before: number;
+    confidence_after: number;
+  }[];
+  weakened: {
+    id: string;
+    key: string;
+    value: string;
+    confidence_before: number;
+    confidence_after: number;
+    archived: boolean;
+  }[];
+  insights: string[];
+  reviewed_steps: number;
 }
 export interface MemoryChange {
   memory_id: string;
@@ -447,6 +468,166 @@ export class AgentService {
       });
       return this.getStep(id);
     })();
+  }
+
+  async reflect(id: string) {
+    const session = this.db
+      .prepare<[string], { id: string; goal_text: string; status: string }>(
+        'SELECT id,goal_text,status FROM sessions WHERE id=?',
+      )
+      .get(id);
+    if (!session) throw new AppError(404, 'SESSION_NOT_FOUND', 'This session could not be found.');
+    if (this.busySessions.has(id) || session.status === 'planning')
+      throw new AppError(409, 'SESSION_BUSY', 'Wait for this session to finish planning.');
+    if (session.status === 'reflected')
+      throw new AppError(409, 'ALREADY_REFLECTED', 'This session has already been reflected on.');
+    const plan = this.db
+      .prepare<[string], { id: string }>(
+        'SELECT id FROM plans WHERE session_id=? ORDER BY version DESC LIMIT 1',
+      )
+      .get(id);
+    if (!plan) throw new AppError(409, 'NO_PLAN', 'This session has no plan to reflect on.');
+    const steps = this.db
+      .prepare<[string], { id: string }>(
+        'SELECT id FROM plan_steps WHERE plan_id=? ORDER BY order_idx',
+      )
+      .all(plan.id)
+      .map((step) => this.getStep(step.id));
+    const reviewed = steps.filter((step) => step.status !== 'proposed');
+    if (reviewed.length === 0)
+      throw new AppError(
+        409,
+        'NOTHING_TO_REFLECT',
+        'Approve, edit, or reject at least one step before reflecting.',
+      );
+    const reviewedIds = new Set(reviewed.map((step) => step.id));
+    const memories = this.memories.list({ limit: 200 }).memories;
+    const memoryIds = new Set(memories.map((memory) => memory.id));
+    const context = {
+      goal: session.goal_text,
+      now: this.clock().toISOString(),
+      reviews: reviewed.map((step) => ({
+        id: step.id,
+        title: step.title,
+        tool: step.tool,
+        status: step.status,
+        reject_reason: step.reject_reason,
+        args: step.edited_args ?? step.args,
+        original_args: step.args,
+        memory_ids: step.memory_ids,
+        result: step.result,
+      })),
+      memories: memories.map((memory) => ({
+        id: memory.id,
+        type: memory.type,
+        key: memory.key,
+        value: memory.value,
+        confidence: memory.confidence,
+        source: memory.source,
+      })),
+    };
+    const learnedSchema = reflectionSchema
+      .refine(
+        (payload) =>
+          payload.new_memories.every((memory) =>
+            memory.evidence_step_ids.every((stepId) => reviewedIds.has(stepId)),
+          ),
+        { message: 'Evidence must reference reviewed steps in this session.' },
+      )
+      .refine(
+        (payload) =>
+          payload.new_memories.every((memory) =>
+            memory.contradicts_ids.every((memoryId) => memoryIds.has(memoryId)),
+          ) &&
+          payload.reinforced_ids.every((memoryId) => memoryIds.has(memoryId)) &&
+          payload.weakened_ids.every((memoryId) => memoryIds.has(memoryId)),
+        { message: 'Memory IDs must come from the supplied context.' },
+      );
+    const reflected = await this.llm.chat({
+      system: REFLECT_PROMPT,
+      messages: [{ role: 'user', content: JSON.stringify(context) }],
+      jsonSchema: learnedSchema,
+    });
+    const payload = learnedSchema.parse(reflected.json);
+    const learned = this.db.transaction((): LearnedPayload => {
+      const reason = `Learned from your review of “${session.goal_text}”.`;
+      const memoryContext = { actor: 'agent' as const, sessionId: id, reason };
+      const byId = new Map(memories.map((memory) => [memory.id, memory]));
+      const contradicted = new Set(
+        payload.new_memories.flatMap((memory) => memory.contradicts_ids),
+      );
+      const created: (Memory & { evidence_step_ids: string[] })[] = [];
+      for (const candidate of payload.new_memories) {
+        for (const existingId of candidate.contradicts_ids) {
+          const existing = byId.get(existingId);
+          if (existing && (existing.type !== candidate.type || existing.key !== candidate.key))
+            this.memories.weaken(existingId, memoryContext);
+        }
+        const memory = this.memories.upsertMemory(
+          {
+            type: candidate.type,
+            key: candidate.key,
+            value: candidate.value,
+            rationale: candidate.rationale,
+            confidence: candidate.confidence,
+            source: 'inferred',
+          },
+          memoryContext,
+        );
+        created.push({ ...memory, evidence_step_ids: candidate.evidence_step_ids });
+      }
+      const reinforced = [...new Set(payload.reinforced_ids)].map((memoryId) => {
+        const before = byId.get(memoryId);
+        const after = this.memories.reinforce(memoryId, memoryContext);
+        return {
+          id: after.id,
+          key: after.key,
+          value: after.value,
+          confidence_before: before?.confidence ?? after.confidence,
+          confidence_after: after.confidence,
+        };
+      });
+      const weakened = [...new Set(payload.weakened_ids)]
+        .filter(
+          (memoryId) =>
+            !contradicted.has(memoryId) &&
+            !payload.reinforced_ids.includes(memoryId) &&
+            byId.has(memoryId),
+        )
+        .flatMap((memoryId) => {
+          const before = byId.get(memoryId);
+          if (!before) return [];
+          const after = this.memories.weaken(memoryId, memoryContext);
+          return [
+            {
+              id: after.id,
+              key: after.key,
+              value: after.value,
+              confidence_before: before.confidence,
+              confidence_after: after.confidence,
+              archived: after.archived,
+            },
+          ];
+        });
+      const result: LearnedPayload = {
+        new_memories: created,
+        reinforced,
+        weakened,
+        insights: payload.insights,
+        reviewed_steps: reviewed.length,
+      };
+      this.db
+        .prepare("UPDATE sessions SET status='reflected',learned_json=? WHERE id=?")
+        .run(JSON.stringify(result), id);
+      this.audit('agent', 'session.reflected', 'session', id, {
+        created: created.length,
+        reinforced: reinforced.length,
+        weakened: weakened.length,
+        reviewed: reviewed.length,
+      });
+      return result;
+    })();
+    return { ...this.getSession(id), reflection: learned };
   }
 
   executeSession(id: string) {

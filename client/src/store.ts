@@ -9,6 +9,7 @@ import {
   memoriesSchema,
   memorySchema,
   executionSchema,
+  reflectionSchema,
   sessionDetailSchema,
   sessionSummarySchema,
   stepSchema,
@@ -34,6 +35,7 @@ interface Workspace {
   loading: boolean;
   planning: boolean;
   executing: boolean;
+  reflecting: boolean;
   libraryVersion: number;
   pending: string[];
   selectedStepId: string | null;
@@ -44,6 +46,7 @@ interface Workspace {
   createPlan: (goal: string, demo?: boolean) => Promise<void>;
   review: (id: string, action: 'approve' | 'edit' | 'reject', body?: unknown) => Promise<boolean>;
   execute: () => Promise<void>;
+  reflect: () => Promise<void>;
   openStep: (sessionId: string, stepId: string) => Promise<void>;
   saveMemory: (id: string, value: string) => Promise<boolean>;
   removeMemory: (id: string) => Promise<void>;
@@ -60,6 +63,7 @@ export const useWorkspace = create<Workspace>((set, get) => ({
   loading: true,
   planning: false,
   executing: false,
+  reflecting: false,
   libraryVersion: 0,
   pending: [],
   selectedStepId: null,
@@ -175,6 +179,38 @@ export const useWorkspace = create<Workspace>((set, get) => ({
       notifyError(error);
     } finally {
       set({ executing: false });
+    }
+  },
+  reflect: async () => {
+    const active = get().active;
+    if (!active || get().reflecting) return;
+    set({ reflecting: true });
+    try {
+      const result = await api(
+        `/sessions/${active.session.id}/reflect`,
+        reflectionSchema,
+        jsonRequest({}),
+      );
+      set({ active: result, libraryVersion: get().libraryVersion + 1 });
+      await get().reloadMemories();
+      const sessions = await api(
+        '/sessions',
+        z.object({ sessions: z.array(sessionSummarySchema) }),
+      );
+      set({ sessions: sessions.sessions });
+      const count = result.reflection.new_memories.length;
+      toast.success(
+        count > 0
+          ? `Learned ${count} new preference${count === 1 ? '' : 's'}.`
+          : 'Context confirmed.',
+        {
+          description: 'Your next plan will start from this.',
+        },
+      );
+    } catch (error) {
+      notifyError(error);
+    } finally {
+      set({ reflecting: false });
     }
   },
   openStep: async (sessionId, stepId) => {

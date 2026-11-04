@@ -23,6 +23,8 @@ import { api, emptySchema, jsonRequest } from './api';
 import { applyTheme, notifyError, usePreferences, useWorkspace, type View } from './store';
 import { PlanCard } from './components/PlanCard';
 import { MemoryPanel } from './components/MemoryPanel';
+import { LearnedCard } from './components/LearnedCard';
+import { PlanComparison } from './components/PlanComparison';
 import { CalendarView } from './components/CalendarView';
 import { NotesView } from './components/NotesView';
 import { DraftsView } from './components/DraftsView';
@@ -80,6 +82,8 @@ export default function App() {
   const approved =
     plan?.steps.filter((step) => ['approved', 'edited'].includes(step.status)).length ?? 0;
   const reviewed = plan?.steps.filter((step) => step.status !== 'proposed').length ?? 0;
+  const executedCount = plan?.steps.filter((step) => step.status === 'executed').length ?? 0;
+  const reflected = state.active?.session.status === 'reflected';
 
   return (
     <MotionConfig reducedMotion="user">
@@ -327,13 +331,18 @@ export default function App() {
                       )}
                       {plan && (
                         <div className="loop-list">
-                          {['Remember', 'Plan', 'Ask', 'Act', 'Learn'].map((name, index) => (
-                            <div key={name} className={index < 3 ? 'done' : ''}>
-                              <span>{index < 2 ? <Check size={12} /> : index + 1}</span>
-                              <p>{name}</p>
-                              {index === 2 && <small>YOUR TURN</small>}
-                            </div>
-                          ))}
+                          {['Remember', 'Plan', 'Ask', 'Act', 'Learn'].map((name, index) => {
+                            const done = [true, true, reviewed > 0, executedCount > 0, reflected][
+                              index
+                            ];
+                            return (
+                              <div key={name} className={done ? 'done' : ''}>
+                                <span>{done ? <Check size={12} /> : index + 1}</span>
+                                <p>{name}</p>
+                                {index === 2 && !done && <small>YOUR TURN</small>}
+                              </div>
+                            );
+                          })}
                         </div>
                       )}
                       {plan && plan.questions_for_user.length > 0 && (
@@ -449,6 +458,21 @@ export default function App() {
                         transition={{ duration: 0.18 }}
                       >
                         <p className="mb-5 text-sm leading-6 text-muted">{plan.summary}</p>
+                        {state.active?.learned && (
+                          <LearnedCard
+                            learned={state.active.learned}
+                            demo={state.active.session.demo_scenario}
+                            onNextGoal={() => {
+                              void state.createPlan(
+                                "Get ready for next week's board meeting.",
+                                true,
+                              );
+                            }}
+                          />
+                        )}
+                        {state.previous?.plan && state.active?.plan && (
+                          <PlanComparison previous={state.previous} current={state.active} />
+                        )}
                         {plan.mode === 'fallback' && (
                           <div className="warning-box mb-4 rounded-xl p-3 text-xs">
                             Live model unavailable. This plan uses an explicitly enabled simulated
@@ -494,6 +518,7 @@ export default function App() {
                               disabled={
                                 state.pending.length > 0 ||
                                 state.executing ||
+                                reflected ||
                                 !plan.steps.some(
                                   (step) =>
                                     step.status === 'proposed' &&
@@ -509,11 +534,15 @@ export default function App() {
                             </button>
                             <button
                               className="button primary ml-auto"
-                              disabled={approved === 0 || state.executing}
+                              disabled={approved === 0 || state.executing || reflected}
                               onClick={() => {
                                 void state.execute();
                               }}
-                              title="Run approved local actions in this session"
+                              title={
+                                reflected
+                                  ? 'This session is locked after learning'
+                                  : 'Run approved local actions in this session'
+                              }
                             >
                               {state.executing ? (
                                 <>
@@ -526,6 +555,34 @@ export default function App() {
                                 </>
                               )}
                             </button>
+                          </div>
+                          <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-line pt-3">
+                            <button
+                              className="button small"
+                              disabled={
+                                reviewed === 0 || reflected || state.executing || state.reflecting
+                              }
+                              onClick={() => {
+                                void state.reflect();
+                              }}
+                              title={
+                                reviewed === 0
+                                  ? 'Approve, edit, or reject a step first'
+                                  : 'Turn your reviews into preferences'
+                              }
+                            >
+                              <BrainCircuit size={14} />
+                              {state.reflecting
+                                ? 'Learning…'
+                                : reflected
+                                  ? 'Learned from this'
+                                  : 'Learn from this'}
+                            </button>
+                            <span className="text-[10px] leading-4 text-muted">
+                              {reflected
+                                ? 'Session locked. Start a new goal to see what changed.'
+                                : 'Turns approvals, edits, and rejection reasons into preferences.'}
+                            </span>
                           </div>
                         </div>
                       </motion.div>

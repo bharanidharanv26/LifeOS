@@ -1,6 +1,6 @@
 # LifeOS phase gates
 
-Phases 1–4 are implemented. Every phase passes `npm run check` before the next begins.
+Phases 1–5 are implemented. Every phase passes `npm run check` before the next begins.
 
 ## Phase 1 — Foundation
 
@@ -60,10 +60,13 @@ Expected: every check passes; `http://localhost:5173` shows a connected database
 
 ## Phase 5 — Learning demo
 
-- Reflection from approvals, before/after edits, and reasoned rejections.
-- Learned diff and memory changes tied to the session.
-- Changed-since-last-time summaries and side-by-side run comparison.
-- Full seed → plan → reject/edit → reflect → changed-plan test in mock mode.
+**Complete. Gate: `npm run check` passed; 52 tests.** `npm run demo` remains runnable.
+
+- [x] Reflection from approvals, before/after edits, and reasoned rejections.
+- [x] Learned diff and memory changes tied to the session (`POST /api/sessions/:id/reflect`).
+- [x] Changed-since-last-time summaries and side-by-side run comparison.
+- [x] Full seed → plan → reject/edit → reflect → changed-plan test in mock mode.
+- [x] New memories animate into the learned card; the demo offers the next goal in one click.
 
 ## Phase 6 — Interaction polish
 

@@ -65,6 +65,31 @@ export const changeSchema = z.object({
   reason: z.string(),
   confidence: z.number(),
 });
+export const learnedSchema = z.object({
+  new_memories: z.array(memorySchema.extend({ evidence_step_ids: z.array(z.string()) })),
+  reinforced: z.array(
+    z.object({
+      id: z.string(),
+      key: z.string(),
+      value: z.string(),
+      confidence_before: z.number(),
+      confidence_after: z.number(),
+    }),
+  ),
+  weakened: z.array(
+    z.object({
+      id: z.string(),
+      key: z.string(),
+      value: z.string(),
+      confidence_before: z.number(),
+      confidence_after: z.number(),
+      archived: z.boolean(),
+    }),
+  ),
+  insights: z.array(z.string()),
+  reviewed_steps: z.number(),
+});
+export type Learned = z.infer<typeof learnedSchema>;
 export const sessionDetailSchema = z.object({
   session: sessionSummarySchema.extend({ demo_scenario: z.boolean() }),
   plan: z
@@ -80,10 +105,11 @@ export const sessionDetailSchema = z.object({
     })
     .nullable(),
   memories: z.array(memorySchema),
-  learned: z.unknown(),
+  learned: learnedSchema.nullable(),
   error: z.unknown(),
 });
 export type SessionDetail = z.infer<typeof sessionDetailSchema>;
+export const reflectionSchema = sessionDetailSchema.extend({ reflection: learnedSchema });
 export const executionSchema = sessionDetailSchema.extend({
   execution: z.object({
     attempted: z.number(),

@@ -20,6 +20,10 @@ export function sessionsRouter(agent: AgentService): Router {
     emptyBodySchema.parse(request.body ?? {});
     response.json(agent.executeSession(z.uuid().parse(request.params.id)));
   });
+  router.post('/:id/reflect', async (request, response) => {
+    emptyBodySchema.parse(request.body ?? {});
+    response.json(await agent.reflect(z.uuid().parse(request.params.id)));
+  });
   return router;
 }
 export function stepsRouter(agent: AgentService): Router {

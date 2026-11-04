@@ -23,3 +23,12 @@
   +- Calendar blocks refuse to run when they overlap an existing local event (`CALENDAR_OVERLAP`). Duplicate creation is therefore impossible, and the conflicting block is named in the error.
   +- Library APIs return the approving step, session, and originating goal so every calendar block, note, and draft can link back to its plan context.
   +- Search notes is local-only and returns bounded excerpts. No email is sent, no external calendar is touched, and every result is labeled `simulated: true`.
+
+## Phase 5
+
+- Reflection is explicit and user-triggered; nothing is learned silently. It requires at least one reviewed step and locks the session afterward so the evidence cannot change underneath the learned result.
+- Reflection output is validated twice: structurally by Zod, then semantically by refines that restrict `evidence_step_ids` to reviewed steps in this session and all memory IDs to the supplied context. Hallucinated IDs are rejected before any write.
+- New memories are always `source: "inferred"` with model confidence capped at 0.98. Same-key conflicts weaken the previous value through `upsertMemory`; cross-key contradictions use explicit weakening. Every event carries the session ID and a human-readable reason.
+- A memory is never weakened merely because a proposal violated it—only an explicit rejection or contradiction does that.
+- The learned diff shows new, reinforced, and weakened memories with before/after confidence. The plan comparator shows v1 and v2 side by side and highlights steps citing changed memories.
+- In mock mode, the second demo goal ("Get ready for next week's board meeting.") deterministically shows the learned noon preference and the edited email structure. The learned card offers that next goal in one click.
