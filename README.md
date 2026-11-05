@@ -13,6 +13,14 @@ npm run demo
 
 Open **http://localhost:8088**. No account, API key, or external service is required. The API runs at **http://127.0.0.1:3001**. `npm run demo` frees ports 3001 and 8088, seeds five fictional preferences and starts both workspaces; Ctrl+C stops them.
 
+**Verified locally:** strict typecheck, lint, formatting, 65 backend tests, production builds, and four Chromium end-to-end runs (1440/1280/768px plus keyboard/focus). **Not verified:** any live Meta endpoint or spoken screen-reader output. The default demo is mock and fully offline; see [verification notes](docs/VERIFICATION.md) and [live setup](docs/META_SETUP.md).
+
+![LifeOS workspace with a guided plan](docs/screenshots/01-workspace.png)
+
+| Reflection diff                                              | The same ask, replanned                              |
+| ------------------------------------------------------------ | ---------------------------------------------------- |
+| ![Learned preferences](docs/screenshots/04-learned-diff.png) | ![Plan comparison](docs/screenshots/05-v1-vs-v2.png) |
+
 ## Why it is different
 
 Most assistants either forget you or act without asking. LifeOS closes the loop:
@@ -23,17 +31,17 @@ Most assistants either forget you or act without asking. LifeOS closes the loop:
 4. **Act** — approved actions write local calendar blocks, notes, and email drafts. Nothing leaves the device.
 5. **Learn** — reflection turns your reviews into new preferences, confidence changes, and a visibly different next plan.
 
-The two-minute demo shows all five stages, including a preference that changes a later schedule.
+The three-minute demo shows all five stages, including a preference that changes a later schedule. The full shot list, narration, and expected labels are in [the recording guide](docs/DEMO.md).
 
 ## Demo script
 
-Seed data: no meetings before 11:00, short bullet emails, protected Friday afternoons, 25-minute prep blocks, Thursday investor updates. All times are UTC.
+Seed data: no meetings before 11:00, short bullet emails, protected Friday afternoons, 25-minute prep blocks, Thursday investor updates. All times are UTC. Click **Reset demo** in the toolbar for a clean, reseeded workspace.
 
 1. Click **Start guided demo**. The goal is “Prepare for my Friday investor call.”
 2. The plan includes a 09:00 prep block. It is intentionally staged and visibly blocked by the 11:00 preference.
 3. Reject the block with “too early”. Edit the agenda email and keep your own structure.
 4. Click **Learn from this**. Review new inferred memories, reinforced items, and confidence changes.
-5. Click the offered next goal, “Get ready for next week's board meeting.”
+5. Click **Try the next goal**, “Get ready for next week's board meeting.”
 6. Compare v1 and v2: the new plan starts at noon and cites your edited email style. Approve safe steps and run them.
 7. Check Calendar, Drafts, Notes, and Audit. Everything is local and labeled simulated.
 
@@ -80,7 +88,7 @@ The database holds `memories`, `memory_events`, `memory_embeddings`, `sessions`,
 
 **Simulated by design:** email is a stored draft and is never sent; calendar blocks and notes stay in SQLite. There is no Gmail/Calendar OAuth, no external contact lookup, and no background agent. Every tool result is labeled `simulated: true`.
 
-**Live model mode:** set `MOCK_MODE=false`, then configure `MODEL_BASE_URL`, `MODEL_API_KEY`, `MODEL_NAME`, and—if the provider differs—`MODEL_AUTH_HEADER`, `MODEL_AUTH_PREFIX`, and `MODEL_JSON_MODE`. The single adaptation point is `mapProviderProtocol` in `server/src/llm/client.ts`. Confirm the exact Meta model identifier in Meta's documentation before recording a demo. In live mode, relevant prompts and memory context go to that endpoint; keys stay server-side. If a live call fails, `MOCK_FALLBACK=true` opts into clearly labeled offline fallback; the default is an honest error after three attempts. `EMBEDDINGS_ENABLED=true` additionally sends the goal and memory key/value text to `/embeddings`; leave it off for a fully offline run.
+**Live model mode:** set `MOCK_MODE=false`, then configure `MODEL_BASE_URL`, `MODEL_API_KEY`, `MODEL_NAME`, and—if the provider differs—`MODEL_AUTH_HEADER`, `MODEL_AUTH_PREFIX`, and `MODEL_JSON_MODE`. The single adaptation point is `mapProviderProtocol` in `server/src/llm/client.ts`. Run `npm run model:ping` for one bounded request that prints mode, latency, tokens, and a redacted error body; then confirm the `ping` row says **LIVE** and **OK** in Model activity. The placeholder URL is not a Meta endpoint, and **no live Meta connection has been verified in this repository**. In live mode, relevant prompts and memory context go to that endpoint; keys stay server-side. If a live call fails, `MOCK_FALLBACK=true` opts into clearly labeled offline fallback; the default is an honest error after three attempts. `EMBEDDINGS_ENABLED=true` additionally sends the goal and memory key/value text to `/embeddings`; leave it off for a fully offline run. Full checklist: [docs/META_SETUP.md](docs/META_SETUP.md).
 
 ## API
 
@@ -152,14 +160,18 @@ Copy `.env.example` to `.env`. Defaults work offline.
 npm run check
 ```
 
-Runs strict TypeScript, ESLint with zero warnings, Prettier check, 58 backend tests, and both production builds. Tests cover memory math, migrations, validation, CORS, rate limits, planning, policy conflicts, review/execute flows, library links, and the full learning loop in isolated databases.
+Runs strict TypeScript, ESLint with zero warnings, Prettier check, 65 backend tests, and both production builds. Tests cover memory math, migrations, validation, CORS, rate limits, planning, policy conflicts, review/execute flows, library links, the full learning loop, and live-model ping failure/redaction paths in isolated databases.
 
 ```sh
+npm run e2e         # Chromium: full loop at 1440/1280/768px + keyboard/focus
+npm run model:ping  # one bounded model request; mock says so explicitly
 npm run seed        # add missing demo memories
 npm run test:watch  # backend watch mode
 npm run build       # client and compiled server
 npm run format      # apply Prettier
 ```
+
+The browser suite fails on console errors, uncaught page errors, failed requests, HTTP errors, horizontal overflow, or unexpected non-mock model calls. Measured mock time from clicking **Start guided demo** to a visible plan is about one second.
 
 ## Limitations and next steps
 
@@ -167,7 +179,9 @@ npm run format      # apply Prettier
 - Retrieval is BM25-style keyword ranking with confidence and recency. Optional embedding reranking is cached and default-off; if the endpoint fails, planning silently returns to keyword results, so semantic quality is not guaranteed in every live setup.
 - Reflection is explicit, not a background learner. One reflected session can seed the next plan, but there is no long-running daemon.
 - No streaming; planning shows a staged progress state instead.
-- Live-model prompts are provider-generic. Exact Meta model behavior should be validated end to end before a submission recording.
+- Live-model prompts are provider-generic and the default endpoint is a placeholder. **No live Meta endpoint, credential, or model identifier has been validated**; run `npm run model:ping` and the full loop before claiming live use.
+- Actual screen-reader speech was not tested; keyboard focus, focus containment, live regions, reduced motion, and contrast were checked automatically.
+- The client ships as one roughly 749 kB minified chunk (213 kB gzip); route-level code splitting is future work. The build also emits third-party zod comment warnings that do not affect output.
 - Future: Gmail/Calendar connectors, on-device embeddings, multi-session learning summaries, and encrypted backups.
 
-See [phase gates](docs/PHASES.md), [design decisions](docs/DECISIONS.md), [architecture](docs/ARCHITECTURE.md), and [prompt contracts](docs/PROMPTS.md).
+See [phase gates](docs/PHASES.md), [design decisions](docs/DECISIONS.md), [architecture](docs/ARCHITECTURE.md), [prompt contracts](docs/PROMPTS.md), [live-model setup](docs/META_SETUP.md), and [verification notes](docs/VERIFICATION.md).
