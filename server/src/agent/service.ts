@@ -591,28 +591,27 @@ export class AgentService {
           confidence_after: after.confidence,
         };
       });
-      const weakened = [...new Set(payload.weakened_ids)]
-        .filter(
-          (memoryId) =>
-            !contradicted.has(memoryId) &&
-            !payload.reinforced_ids.includes(memoryId) &&
-            byId.has(memoryId),
-        )
-        .flatMap((memoryId) => {
-          const before = byId.get(memoryId);
-          if (!before) return [];
-          const after = this.memories.weaken(memoryId, memoryContext);
-          return [
-            {
-              id: after.id,
-              key: after.key,
-              value: after.value,
-              confidence_before: before.confidence,
-              confidence_after: after.confidence,
-              archived: after.archived,
-            },
-          ];
-        });
+      for (const memoryId of new Set(payload.weakened_ids)) {
+        if (!contradicted.has(memoryId) && !payload.reinforced_ids.includes(memoryId))
+          this.memories.weaken(memoryId, memoryContext);
+      }
+      // Include automatic same-key contradictions from upsertMemory in the visible diff.
+      // Read their final values rather than weakening them a second time.
+      const weakened = memories.flatMap((before) => {
+        const after = this.memories.getMemory(before.id);
+        return after.confidence < before.confidence
+          ? [
+              {
+                id: after.id,
+                key: after.key,
+                value: after.value,
+                confidence_before: before.confidence,
+                confidence_after: after.confidence,
+                archived: after.archived,
+              },
+            ]
+          : [];
+      });
       const result: LearnedPayload = {
         new_memories: created,
         reinforced,

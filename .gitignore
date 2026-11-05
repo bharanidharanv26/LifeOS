@@ -13,3 +13,6 @@ coverage/
 .DS_Store
 Thumbs.db
 .qodo/
+test-results/
+playwright-report/
+blob-report/

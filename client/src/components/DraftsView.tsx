@@ -8,10 +8,12 @@ export function DraftsView() {
   const { libraryVersion, openStep } = useWorkspace();
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
   useEffect(() => {
     api('/drafts?limit=200', draftsSchema)
       .then((data) => setDrafts(data.drafts))
-      .catch((error: unknown) => notifyError(error));
+      .catch((error: unknown) => notifyError(error))
+      .finally(() => setLoading(false));
   }, [libraryVersion]);
   return (
     <section className="library-view" aria-labelledby="drafts-title">
@@ -23,7 +25,8 @@ export function DraftsView() {
           Drafts are simulated and saved locally. Nothing was sent or scheduled.
         </p>
       </div>
-      {drafts.length === 0 && (
+      {loading && <p className="mt-8 text-xs text-muted">Loading drafts…</p>}
+      {!loading && drafts.length === 0 && (
         <div className="empty-state mt-8">
           <Mail size={28} />
           <h2>No drafts yet</h2>

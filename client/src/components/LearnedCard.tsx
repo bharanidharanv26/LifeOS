@@ -53,6 +53,18 @@ export function LearnedCard({
                   {Math.round(memory.confidence * 100)}% confident
                 </span>
               </div>
+              {learned.weakened
+                .filter((older) => older.key === memory.key)
+                .map((older) => (
+                  <div
+                    key={older.id}
+                    className="mt-3 border-l-2 border-line pl-3 text-xs text-muted"
+                  >
+                    <span className="eyebrow">Before</span>
+                    <p className="mt-1">{older.value}</p>
+                  </div>
+                ))}
+              <p className="eyebrow mt-3">After · learned preference</p>
               <p className="mt-2 whitespace-pre-wrap break-words text-[13px] leading-6">
                 {memory.value}
               </p>

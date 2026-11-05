@@ -130,6 +130,17 @@ export default function App() {
   const reviewed = plan?.steps.filter((step) => step.status !== 'proposed').length ?? 0;
   const executedCount = plan?.steps.filter((step) => step.status === 'executed').length ?? 0;
   const reflected = state.active?.session.status === 'reflected';
+  const planId = plan?.id;
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [state.view]);
+  useEffect(() => {
+    if (!state.planning && planId) {
+      const target = document.getElementById(reflected ? 'learned-title' : 'plan-title');
+      target?.scrollIntoView({ block: 'start' });
+    }
+  }, [planId, state.planning, reflected]);
 
   return (
     <MotionConfig reducedMotion="user">

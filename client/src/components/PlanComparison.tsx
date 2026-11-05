@@ -23,7 +23,7 @@ function Column({ detail, changedIds }: { detail: SessionDetail; changedIds: Set
             key={step.id}
             className={`compare-step ${step.memory_ids.some((id) => changedIds.has(id)) ? 'changed-step' : ''}`}
           >
-            <div className="flex items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <strong className="text-[11px]">{step.title}</strong>
               <span className="status">{step.status}</span>
             </div>

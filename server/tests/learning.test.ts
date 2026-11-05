@@ -33,6 +33,13 @@ describe('reflection and learning', () => {
       expect.arrayContaining(['no_morning_blocks', 'email_style']),
     );
     expect(reflected.reflection.insights.length).toBeGreaterThan(0);
+    expect(reflected.reflection.weakened).toEqual([
+      expect.objectContaining({
+        key: 'email_style',
+        confidence_before: 0.9,
+        confidence_after: 0.65,
+      }),
+    ]);
     const learnedMemory = fixture.memories
       .list()
       .memories.find((memory) => memory.key === 'no_morning_blocks');

@@ -25,7 +25,7 @@ export function NotesView() {
             Local notes
           </h2>
           <p className="mt-1 text-[11px] text-muted">
-            Saved by approved steps. Search matches titles, bodies, and tags.
+            Simulated notes saved locally by approved steps. Search titles, bodies, and tags.
           </p>
         </div>
         <label className="search-field w-full sm:w-64">
@@ -55,7 +55,7 @@ export function NotesView() {
           <article key={note.id} className="library-card">
             <div className="flex items-start justify-between gap-2">
               <h3 className="text-[15px] font-semibold leading-6">{note.title}</h3>
-              <span className="source-badge">Local</span>
+              <span className="source-badge">Simulated</span>
             </div>
             <p className="mt-2 whitespace-pre-wrap break-words text-[13px] leading-6 text-muted">
               {note.body}

@@ -13,6 +13,10 @@ function summarize(detail: unknown): string {
   if (typeof detail === 'string') return detail;
   if (detail && typeof detail === 'object') {
     return Object.entries(detail as Record<string, unknown>)
+      .filter(
+        ([, value]) =>
+          typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean',
+      )
       .slice(0, 4)
       .map(
         ([key, value]) =>
@@ -112,8 +116,14 @@ export function AuditView() {
                 </span>
               </p>
               {summarize(entry.detail) && (
-                <p className="mt-1 truncate text-[11px] text-muted">{summarize(entry.detail)}</p>
+                <p className="mt-1 break-words text-[11px] text-muted">{summarize(entry.detail)}</p>
               )}
+              <details className="mt-2 text-[11px] text-muted">
+                <summary>View details</summary>
+                <pre className="preview mt-2 whitespace-pre-wrap break-all">
+                  {JSON.stringify(entry.detail, null, 2)}
+                </pre>
+              </details>
             </div>
             <time className="shrink-0 text-[10px] tabular-nums text-muted" dateTime={entry.ts}>
               {dateLabel(entry.ts)}
