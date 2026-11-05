@@ -34,3 +34,12 @@ Live Meta connectivity and model quality have not been verified.
 - Keyboard browser test covers blocked A, R with focused reason input, E with focused body editor, typing without firing shortcuts, A approval, and locked-session shortcuts.
 - Onboarding and drawers previously allowed focus to escape. They now trap Tab/Shift+Tab, close on Escape, make the background inert, and restore focus. Browser checks include a visible 2px focus outline, the polite notification live region, updated workspace status, and reduced-motion mode. Actual spoken screen-reader output is not verified.
 - One visible toast at a time avoids notification stacks; tablet empty-state spacing keeps the start button above reset feedback.
+
+## Step 4
+
+- `npm run model:ping` (mock mode, fallback off): exit 0; prints `OK`, model `mock/lifeos-v1`, mode `mock`, elapsed time, zero tokens, and an explicit statement that no endpoint was contacted.
+- The ping path uses the production `createLlmClient` and `mapProviderProtocol` with one attempt, an eight-output-token cap, and a persisted `llm_calls` row. It prints live mode as `live` and treats a simulated fallback or blank output as failure.
+- Failure output includes the redacted raw response body, HTTP status, and elapsed time, exits nonzero, and reports a missing response body on transport failures. Unit tests cover HTTP 401/503, malformed success, timeout, token reporting, the request cap, mock labeling, and fallback honesty; configured credentials and common secret fields are asserted absent.
+- `docs/META_SETUP.md` documents both `.env` locations, all model variables, the single protocol adaptation point, the ping command, the LIVE evidence required in Model activity, and records that live Meta connectivity is still **not verified**.
+- A local HTTP stub (not Meta) exercised the real CLI process: HTTP 401 exited nonzero, printed the provider error code, printed the raw body with the bearer credential and echoed token replaced by `[REDACTED]`; an OpenAI-shaped success returned `OK`, `mode: live`, and 7 provider-reported tokens. The outgoing request carried the configured model name and an eight-token cap, and the database row was written to a temporary file.
+- `npm run check`: exit 0; 65 backend tests passed (7 new).

@@ -15,6 +15,8 @@ export interface ChatInput<T = unknown> {
   jsonSchema?: z.ZodType<T>;
   temperature?: number;
   purpose?: string;
+  maxAttempts?: 1 | 2 | 3;
+  maxTokens?: number;
 }
 export interface ChatResult<T = unknown> {
   text: string;
@@ -48,6 +50,7 @@ export function mapProviderProtocol(config: Config, input: ChatInput, messages: 
         model: config.modelName,
         messages: [{ role: 'system', content: input.system }, ...messages],
         temperature: input.temperature ?? 0.2,
+        ...(input.maxTokens ? { max_tokens: input.maxTokens } : {}),
         ...(input.jsonSchema && config.modelJsonMode
           ? { response_format: { type: 'json_object' } }
           : {}),
@@ -121,7 +124,7 @@ export function createLlmClient(db: LifeDatabase, config: Config, fetchImpl: typ
         'MODEL_UNAVAILABLE',
         'The model could not complete this request. Retry or explicitly enable mock mode.',
       );
-      for (let attempt = 0; attempt < 3; attempt++) {
+      for (let attempt = 0; attempt < (input.maxAttempts ?? 3); attempt++) {
         retries = attempt;
         let text = '';
         try {

@@ -15,6 +15,7 @@
     "dev": "concurrently --kill-others -n server,client -c cyan,green \"npm run dev --workspace server\" \"npm run dev --workspace client\"",
     "demo": "node scripts/free-ports.mjs && npm run seed && npm run dev",
     "seed": "npm run seed --workspace server",
+    "model:ping": "npm run model:ping --workspace server",
     "test": "npm run test --workspace server",
     "e2e": "node scripts/free-ports.mjs && playwright test",
     "test:watch": "npm run test:watch --workspace server",
