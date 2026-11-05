@@ -43,7 +43,7 @@ export function LearnedCard({
               key={memory.id}
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.28, delay: index * 0.07, ease: [0.23, 1, 0.32, 1] }}
+              transition={{ duration: 0.18, delay: index * 0.04, ease: [0.23, 1, 0.32, 1] }}
               className="learned-memory"
             >
               <div className="flex flex-wrap items-center gap-2">

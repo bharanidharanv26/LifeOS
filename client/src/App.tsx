@@ -15,6 +15,7 @@ import {
   Moon,
   Play,
   Plus,
+  RotateCcw,
   ShieldCheck,
   Sparkles,
   Sun,
@@ -165,6 +166,7 @@ export default function App() {
                 className={`nav-item ${state.view === name ? 'active' : ''}`}
                 aria-current={state.view === name ? 'page' : undefined}
                 title={name}
+                aria-label={name}
                 onClick={() => state.setView(name)}
               >
                 <Icon size={18} />
@@ -244,6 +246,25 @@ export default function App() {
             </div>
             <div className="flex items-center gap-2">
               <button
+                className="button small"
+                title="Clear sessions and tool results, and restore the five demo memories"
+                disabled={
+                  seeding ||
+                  state.resetting ||
+                  state.planning ||
+                  state.executing ||
+                  state.reflecting ||
+                  state.pending.length > 0
+                }
+                onClick={() => {
+                  setGoal('');
+                  void state.resetDemo();
+                }}
+              >
+                <RotateCcw size={14} />
+                {state.resetting ? 'Resetting…' : 'Reset demo'}
+              </button>
+              <button
                 className="icon-button"
                 aria-label="How LifeOS works"
                 title="How it works"
@@ -274,7 +295,7 @@ export default function App() {
                 {!state.health
                   ? 'CONNECTING'
                   : state.health.mockMode
-                    ? 'MOCK · SIMULATED'
+                    ? 'Demo mode: model and tools are simulated'
                     : 'LIVE MODEL'}
               </span>
               <button
@@ -373,6 +394,25 @@ export default function App() {
               </button>
             </form>
 
+            {state.view === 'Sessions' && !state.active && !state.planning && (
+              <section className="how-it-works" aria-label="How it works">
+                {[
+                  ['Remember', 'Recall your preferences.'],
+                  ['Plan', 'Propose useful steps.'],
+                  ['Ask', 'You approve, edit or reject.'],
+                  ['Act', 'Run approved local tools.'],
+                  ['Learn', 'Improve the next plan.'],
+                ].map(([title, description], index) => (
+                  <div key={title}>
+                    <strong>
+                      {title}
+                      {index < 4 && <ArrowRight size={12} aria-hidden="true" />}
+                    </strong>
+                    <p>{description}</p>
+                  </div>
+                ))}
+              </section>
+            )}
             {state.view === 'Memory' ? (
               <>
                 <MemoryPanel expanded />
@@ -387,7 +427,7 @@ export default function App() {
             ) : state.view === 'Audit' ? (
               <AuditView />
             ) : (
-              <div className="workspace-grid">
+              <div className="workspace-grid" key={state.resetVersion}>
                 <section className="goal-panel" aria-labelledby="goal-title">
                   <div className="panel-heading">
                     <h2 id="goal-title">The conversation</h2>
@@ -532,7 +572,7 @@ export default function App() {
                                 className="flex items-center gap-3 text-sm text-muted"
                               >
                                 <span className="count-badge">{index + 1}</span>
-                                {label}
+                                <span>{label}</span>
                               </li>
                             ),
                           )}
@@ -715,7 +755,7 @@ export default function App() {
                           <ArrowRight size={14} />
                         </button>
                         <span className="mt-3 block text-[11px] text-muted">
-                          Fictional investor-call scenario · about 2 minutes
+                          Fictional investor-call scenario · 3-minute walkthrough
                         </span>
                       </div>
                     )}
@@ -759,6 +799,7 @@ export default function App() {
       <Toaster
         theme={theme}
         position="bottom-right"
+        visibleToasts={1}
         closeButton
         toastOptions={{ style: { fontFamily: 'Inter, sans-serif' } }}
       />

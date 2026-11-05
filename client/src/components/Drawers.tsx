@@ -4,6 +4,7 @@ import { Activity, Play, RefreshCw, Sparkles, X } from 'lucide-react';
 import { z } from 'zod';
 import { api, dateLabel } from '../api';
 import { notifyError } from '../store';
+import { useDialogFocus } from './useDialogFocus';
 
 const llmCallSchema = z.object({
   id: z.string(),
@@ -34,16 +35,8 @@ function Drawer({
   onClose: () => void;
   children: ReactNode;
 }) {
-  const closeRef = useRef<HTMLButtonElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    closeRef.current?.focus();
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [open, onClose]);
+  const dialogRef = useRef<HTMLElement>(null);
+  useDialogFocus(open, dialogRef, onClose);
   return (
     <AnimatePresence>
       {open && (
@@ -57,6 +50,7 @@ function Drawer({
             onClick={onClose}
           />
           <motion.aside
+            ref={dialogRef}
             role="dialog"
             aria-modal="true"
             aria-labelledby="drawer-title"
@@ -73,12 +67,7 @@ function Drawer({
                 </h2>
                 <p className="mt-1 text-[11px] leading-5 text-muted">{description}</p>
               </div>
-              <button
-                ref={closeRef}
-                className="icon-button"
-                aria-label="Close panel"
-                onClick={onClose}
-              >
+              <button className="icon-button" aria-label="Close panel" onClick={onClose}>
                 <X size={17} />
               </button>
             </div>
@@ -202,7 +191,7 @@ export function DemoDrawer({
       open={open}
       onClose={onClose}
       title="Demo script"
-      description="A two-minute path through the whole loop. Simulations are labeled; contacts are fictional."
+      description="A three-minute path through the whole loop. Simulations are labeled; contacts are fictional."
     >
       <ol className="space-y-3">
         {script.map((item, index) => (

@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ArrowLeft, ArrowRight, BrainCircuit, Check, ShieldCheck, Sparkles } from 'lucide-react';
+import { useDialogFocus } from './useDialogFocus';
 
 const steps = [
   {
@@ -16,7 +17,7 @@ const steps = [
   {
     icon: Sparkles,
     title: 'It learns from your decisions.',
-    body: 'Your edits and rejection reasons become context for the next plan. Start with the guided demo to see the whole loop in about two minutes.',
+    body: 'Your edits and rejection reasons become context for the next plan. Start with the guided demo to see the whole loop in about three minutes.',
   },
 ];
 
@@ -32,6 +33,8 @@ export function Onboarding({
   onStartDemo: () => void;
 }) {
   const [index, setIndex] = useState(0);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useDialogFocus(open, dialogRef, onClose);
   const step = steps[index] ?? steps[0]!;
   const Icon = step.icon;
   const last = index === steps.length - 1;
@@ -46,6 +49,7 @@ export function Onboarding({
           transition={{ duration: 0.18 }}
         >
           <motion.div
+            ref={dialogRef}
             role="dialog"
             aria-modal="true"
             aria-labelledby="onboarding-title"
@@ -126,8 +130,8 @@ export function Onboarding({
               )}
             </div>
             <p className="mt-3 text-[10px] leading-4 text-muted">
-              Everything stays on this device. Simulated actions are labeled. Nothing is sent
-              without your approval.
+              Tool actions are local simulations. Mock mode stays offline; live mode sends goals and
+              relevant context to your configured model endpoint.
             </p>
           </motion.div>
         </motion.div>

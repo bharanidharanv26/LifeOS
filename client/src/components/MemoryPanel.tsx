@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { api, dateLabel, historySchema, jsonRequest, memorySchema, type Memory } from '../api';
 import { notifyError, useWorkspace } from '../store';
 
-function MemoryItem({ memory }: { memory: Memory }) {
+function MemoryItem({ memory, superseded }: { memory: Memory; superseded: boolean }) {
   const { highlightedMemoryId, saveMemory, removeMemory } = useWorkspace();
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(memory.value);
@@ -14,12 +14,13 @@ function MemoryItem({ memory }: { memory: Memory }) {
   return (
     <article
       id={`memory-${memory.id}`}
-      className={`memory-item ${highlightedMemoryId === memory.id ? 'highlighted' : ''}`}
+      className={`memory-item ${superseded ? 'superseded' : ''} ${highlightedMemoryId === memory.id ? 'highlighted' : ''}`}
     >
       <div className="mb-2 flex items-center justify-between gap-2">
         <span className="source-badge">
           {memory.source === 'user' ? 'You' : memory.source === 'inferred' ? 'Inferred' : 'Seed'}
         </span>
+        {superseded && <span className="source-badge">superseded</span>}
         <span className="text-[11px] tabular-nums text-muted">
           {Math.round(memory.confidence * 100)}%
         </span>
@@ -149,9 +150,30 @@ export function MemoryPanel({ expanded = false }: { expanded?: boolean }) {
   const [value, setValue] = useState('');
   const [type, setType] = useState<Memory['type']>('preference');
   const [busy, setBusy] = useState(false);
-  const filtered = memories.filter((memory) =>
-    `${memory.key} ${memory.value}`.toLowerCase().includes(query.toLowerCase()),
+  const supersededIds = new Set(
+    memories
+      .filter(
+        (memory) =>
+          memory.times_contradicted > 0 &&
+          memories.some(
+            (other) =>
+              other.type === memory.type &&
+              other.key === memory.key &&
+              other.value !== memory.value &&
+              other.confidence > memory.confidence,
+          ),
+      )
+      .map((memory) => memory.id),
   );
+  const filtered = memories
+    .filter((memory) => `${memory.key} ${memory.value}`.toLowerCase().includes(query.toLowerCase()))
+    .sort(
+      (a, b) =>
+        Number(supersededIds.has(a.id)) - Number(supersededIds.has(b.id)) ||
+        b.confidence - a.confidence ||
+        a.key.localeCompare(b.key) ||
+        a.value.localeCompare(b.value),
+    );
   async function add() {
     setBusy(true);
     try {
@@ -251,7 +273,11 @@ export function MemoryPanel({ expanded = false }: { expanded?: boolean }) {
               </h3>
               <div className={expanded ? 'memory-grid' : 'space-y-3'}>
                 {items.map((memory) => (
-                  <MemoryItem key={memory.id} memory={memory} />
+                  <MemoryItem
+                    key={memory.id}
+                    memory={memory}
+                    superseded={supersededIds.has(memory.id)}
+                  />
                 ))}
               </div>
             </section>

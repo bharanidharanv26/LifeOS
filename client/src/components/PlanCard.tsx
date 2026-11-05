@@ -98,11 +98,12 @@ export function PlanCard({ step, locked }: { step: Step; locked: boolean }) {
       if (detail.action === 'approve' && !blocked && !finished && !busy) {
         void review(step.id, 'approve');
       }
-      if (detail.action === 'edit' && !finished) {
+      if (detail.action === 'edit' && !finished && !busy) {
         setDraft(step.edited_args ?? step.args);
         setForm('edit');
       }
-      if (detail.action === 'reject' && !finished) setForm('reject');
+      if (detail.action === 'reject' && !finished && !busy && step.status !== 'rejected')
+        setForm('reject');
     };
     window.addEventListener('lifeos:step-action', onAction);
     return () => window.removeEventListener('lifeos:step-action', onAction);

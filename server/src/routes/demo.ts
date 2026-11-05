@@ -5,7 +5,9 @@ import { resetDemo, seedDemo } from '../demo/service.js';
 import type { Clock } from '../memory/service.js';
 
 const seedBodySchema = z.object({}).strict();
-const resetBodySchema = z.object({ confirm: z.literal('FORGET EVERYTHING') }).strict();
+const resetBodySchema = z
+  .object({ confirm: z.literal('FORGET EVERYTHING'), reseed: z.boolean().default(false) })
+  .strict();
 
 export function demoRouter(db: LifeDatabase, clock: Clock): Router {
   const router = Router();
@@ -14,8 +16,13 @@ export function demoRouter(db: LifeDatabase, clock: Clock): Router {
     response.json(seedDemo(db, clock));
   });
   router.post('/reset', (request, response) => {
-    resetBodySchema.parse(request.body);
-    response.json(resetDemo(db));
+    const { reseed } = resetBodySchema.parse(request.body);
+    response.json(
+      db.transaction(() => {
+        const result = resetDemo(db);
+        return reseed ? { ...result, seed: seedDemo(db, clock) } : result;
+      })(),
+    );
   });
   return router;
 }

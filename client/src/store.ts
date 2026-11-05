@@ -36,6 +36,8 @@ interface Workspace {
   planning: boolean;
   executing: boolean;
   reflecting: boolean;
+  resetting: boolean;
+  resetVersion: number;
   libraryVersion: number;
   pending: string[];
   selectedStepId: string | null;
@@ -47,6 +49,7 @@ interface Workspace {
   review: (id: string, action: 'approve' | 'edit' | 'reject', body?: unknown) => Promise<boolean>;
   execute: () => Promise<void>;
   reflect: () => Promise<void>;
+  resetDemo: () => Promise<void>;
   openStep: (sessionId: string, stepId: string) => Promise<void>;
   saveMemory: (id: string, value: string) => Promise<boolean>;
   removeMemory: (id: string) => Promise<void>;
@@ -64,6 +67,8 @@ export const useWorkspace = create<Workspace>((set, get) => ({
   planning: false,
   executing: false,
   reflecting: false,
+  resetting: false,
+  resetVersion: 0,
   libraryVersion: 0,
   pending: [],
   selectedStepId: null,
@@ -102,7 +107,13 @@ export const useWorkspace = create<Workspace>((set, get) => ({
     if (get().planning) return;
     set({ planning: true, view: 'Sessions' });
     try {
-      const active = await api('/sessions', sessionDetailSchema, jsonRequest({ goal, demo }));
+      // A short, bounded reading window makes the three progress labels visible in mock mode.
+      const [active] = await Promise.all([
+        api('/sessions', sessionDetailSchema, jsonRequest({ goal, demo })),
+        get().health?.mockMode
+          ? new Promise((resolve) => setTimeout(resolve, 650))
+          : Promise.resolve(),
+      ]);
       set({ previous: get().active, active, selectedStepId: active.plan?.steps[0]?.id ?? null });
       await get().load();
       toast.success('Your plan is ready to review. Nothing has run.');
@@ -211,6 +222,44 @@ export const useWorkspace = create<Workspace>((set, get) => ({
       notifyError(error);
     } finally {
       set({ reflecting: false });
+    }
+  },
+  resetDemo: async () => {
+    if (
+      get().resetting ||
+      get().planning ||
+      get().executing ||
+      get().reflecting ||
+      get().pending.length
+    )
+      return;
+    set({ resetting: true });
+    try {
+      await api(
+        '/demo/reset',
+        emptySchema,
+        jsonRequest({ confirm: 'FORGET EVERYTHING', reseed: true }),
+      );
+      set({
+        active: null,
+        previous: null,
+        sessions: [],
+        memories: [],
+        selectedStepId: null,
+        highlightedMemoryId: null,
+        pending: [],
+        view: 'Sessions',
+        libraryVersion: get().libraryVersion + 1,
+        resetVersion: get().resetVersion + 1,
+      });
+      await get().load();
+      toast.dismiss();
+      toast.success('Demo reset. Five seed memories, a fresh workspace.');
+      window.scrollTo(0, 0);
+    } catch (error) {
+      notifyError(error);
+    } finally {
+      set({ resetting: false });
     }
   },
   openStep: async (sessionId, stepId) => {

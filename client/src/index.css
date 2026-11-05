@@ -204,6 +204,9 @@
     min-width: 0;
   }
   .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 20;
     height: 75px;
     padding: 0 30px;
     display: flex;
@@ -253,8 +256,7 @@
     border: 1px solid rgb(var(--line));
     border-radius: 6px;
     padding: 5px 8px;
-    font-size: 8px;
-    letter-spacing: 0.7px;
+    font-size: 11px;
     font-weight: 600;
   }
   .mode-badge.mock {
@@ -318,7 +320,29 @@
   }
   #plan-title,
   #learned-title {
-    scroll-margin-top: 24px;
+    scroll-margin-top: 98px;
+  }
+  .how-it-works {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 16px;
+    padding: 16px 18px;
+    margin-bottom: 24px;
+    border: 1px solid rgb(var(--line));
+    border-radius: 12px;
+    background: rgb(var(--panel));
+  }
+  .how-it-works strong {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: rgb(var(--accent));
+    font-size: 12px;
+  }
+  .how-it-works p {
+    margin-top: 5px;
+    font-size: 11px;
+    color: rgb(var(--muted));
   }
   .goal-panel {
     padding-right: 0;
@@ -623,6 +647,14 @@
     border-color: rgb(var(--accent));
     box-shadow: 0 0 0 3px rgb(var(--accent) / 0.08);
   }
+  .memory-item.superseded {
+    background: rgb(var(--soft));
+    color: rgb(var(--muted));
+    border-style: dashed;
+  }
+  .memory-item.superseded .confidence-track span {
+    background: rgb(var(--muted) / 0.4);
+  }
   .source-badge {
     font-size: 9px;
     border-radius: 4px;
@@ -663,19 +695,19 @@
     line-height: 1.8;
   }
   .plan-empty {
-    min-height: 495px;
+    min-height: 410px;
     display: flex;
     align-items: center;
     flex-direction: column;
     text-align: center;
-    padding: 48px 30px;
+    padding: 30px 24px;
     border: 1px solid rgb(var(--line));
     border-radius: 18px;
     background: rgb(var(--panel));
   }
   .plan-empty h2 {
     margin-top: 16px;
-    font-size: 27px;
+    font-size: 24px;
     font-weight: 600;
     line-height: 1.35;
     letter-spacing: -0.9px;
@@ -690,15 +722,15 @@
   .empty-art {
     position: relative;
     display: flex;
-    width: 100px;
-    height: 100px;
+    width: 72px;
+    height: 72px;
     align-items: center;
     justify-content: center;
     border: 1px solid rgb(var(--accent) / 0.13);
     border-radius: 28px;
     color: rgb(var(--accent));
     background: rgb(var(--accent) / 0.035);
-    margin-bottom: 27px;
+    margin-bottom: 18px;
   }
   .art-dot {
     position: absolute;
@@ -1127,6 +1159,28 @@
   background: #78350f;
 }
 @media (max-width: 900px) {
+  .plan-empty {
+    padding: 24px 20px;
+  }
+  .plan-empty .empty-art {
+    margin-bottom: 12px;
+  }
+  .plan-empty h2,
+  .plan-empty > p {
+    margin-top: 12px;
+  }
+  .plan-empty > .button {
+    margin-top: 20px;
+  }
+  .topbar > div:first-child {
+    display: none;
+  }
+  .topbar > div:last-child {
+    flex-wrap: wrap;
+  }
+  .how-it-works {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
   .week-grid {
     grid-template-columns: repeat(7, minmax(0, 1fr));
   }
@@ -1161,7 +1215,8 @@
   }
   .topbar {
     padding: 0 22px;
-    height: 65px;
+    min-height: 65px;
+    height: auto;
   }
   .main-content {
     padding: 23px 18px 0;
@@ -1209,7 +1264,7 @@
     width: 40px;
   }
   .mode-badge {
-    font-size: 7px;
+    font-size: 10px;
   }
   .command-bar {
     gap: 9px;

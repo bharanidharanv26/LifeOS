@@ -37,7 +37,7 @@ async function noPageOverflow(page: Page) {
 }
 
 for (const width of [1440, 1280, 768]) {
-  test(`guided learning loop at ${width}px`, async ({ page }, testInfo) => {
+  test(`guided learning loop at ${width}px`, async ({ page, request }, testInfo) => {
     await page.setViewportSize({ width, height: 900 });
     const capture = async (name: string, responsive = false) => {
       await noPageOverflow(page);
@@ -51,6 +51,11 @@ for (const width of [1440, 1280, 768]) {
     await page.goto('/');
     await page.getByRole('button', { name: 'Skip', exact: true }).click();
     await expect(page.getByText('Local database connected')).toBeVisible();
+    await page.getByRole('button', { name: 'Reset demo', exact: true }).click();
+    await expect(page.getByRole('region', { name: 'How it works', exact: true })).toBeVisible();
+    await expect(
+      page.getByText('Demo mode: model and tools are simulated', { exact: true }),
+    ).toBeVisible();
     for (const [view, heading] of [
       ['Calendar', 'No local blocks yet'],
       ['Drafts', 'No drafts yet'],
@@ -70,6 +75,9 @@ for (const width of [1440, 1280, 768]) {
 
     const started = Date.now();
     await page.getByRole('button', { name: 'Start guided demo', exact: true }).click();
+    await expect(page.getByText('Recalling memories…', { exact: true })).toBeVisible();
+    await expect(page.getByText('Planning…', { exact: true })).toBeVisible();
+    await expect(page.getByText('Checking your preferences…', { exact: true })).toBeVisible();
     const calendar = page.getByRole('article', { name: /Prepare for your investor call/ });
     await expect(calendar).toBeVisible();
     const planMs = Date.now() - started;
@@ -108,8 +116,24 @@ for (const width of [1440, 1280, 768]) {
     const learned = page.getByRole('region', { name: 'What I learned' });
     await expect(learned).toContainText('email style');
     await expect(learned).toContainText('→');
+    await page.getByRole('textbox', { name: 'Search memories' }).fill('email_style');
+    const oldStyle = page
+      .locator('.memory-item')
+      .filter({ hasText: 'Write short, bullet-style emails.' });
+    await expect(oldStyle).toContainText('superseded');
+    await expect(oldStyle).toHaveClass(/superseded/);
+    expect(
+      await page.locator('.memory-item').evaluateAll((items) => {
+        const older = items.findIndex((item) =>
+          item.textContent?.includes('Write short, bullet-style emails.'),
+        );
+        const newer = items.findIndex((item) => item.textContent?.includes('Decision first:'));
+        return newer >= 0 && newer < older;
+      }),
+    ).toBe(true);
     await learned.scrollIntoViewIfNeeded();
     await capture('04-learned-diff');
+    await page.getByRole('textbox', { name: 'Search memories' }).fill('');
 
     await page.getByRole('button', { name: 'Try the next goal' }).click();
     const board = page.getByRole('article', { name: /Prepare for your board meeting/ });
@@ -161,5 +185,96 @@ for (const width of [1440, 1280, 768]) {
       await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
       await capture('09-dark-theme');
     }
+    await page.getByRole('button', { name: 'Reset demo', exact: true }).click();
+    await expect(
+      page.getByRole('button', { name: 'Start guided demo', exact: true }),
+    ).toBeVisible();
+    await expect(page.locator('.memory-item')).toHaveCount(5);
+    const reset = await (await request.get('/api/export')).json();
+    expect(reset).toMatchObject({
+      sessions: [],
+      plans: [],
+      plan_steps: [],
+      calendar_events: [],
+      email_drafts: [],
+      notes: [],
+      llm_calls: [],
+    });
+    expect(reset.memories).toHaveLength(5);
+    expect(reset.memories).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ key: 'email_style', confidence: 0.9, times_contradicted: 0 }),
+        expect.objectContaining({ key: 'meeting_start_time', confidence: 0.95 }),
+        expect.objectContaining({ key: 'friday_focus_time', confidence: 0.9 }),
+        expect.objectContaining({ key: 'prep_duration_minutes', confidence: 0.85 }),
+        expect.objectContaining({ key: 'investor_update_day', confidence: 0.9 }),
+      ]),
+    );
+    await page.getByRole('button', { name: 'Start guided demo', exact: true }).click();
+    await expect(
+      page.getByRole('article', { name: /Prepare for your investor call/ }),
+    ).toContainText('Policy warning');
+    await expect(page.locator('.plan-panel .count-badge').first()).toHaveText('v1');
   });
 }
+
+test('keyboard review, focus containment, live-region feedback and reduced motion', async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/');
+  const skip = page.getByRole('button', { name: 'Skip', exact: true });
+  await expect(skip).toBeFocused();
+  await page.keyboard.press('Shift+Tab');
+  await expect(page.getByRole('button', { name: 'Next', exact: true })).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(skip).toBeFocused();
+  await expect(skip).toHaveCSS('outline-style', 'solid');
+  await expect(skip).toHaveCSS('outline-width', '2px');
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  const modelButton = page.getByRole('button', { name: 'Open model activity' });
+  await modelButton.click();
+  await expect(page.getByRole('button', { name: 'Close panel' })).toBeFocused();
+  await page.keyboard.press('Shift+Tab');
+  await expect(page.getByRole('button', { name: 'Refresh', exact: true })).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(page.getByRole('button', { name: 'Close panel' })).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(modelButton).toBeFocused();
+  await page.getByRole('button', { name: 'Start guided demo', exact: true }).click();
+  const calendar = page.getByRole('article', { name: /Prepare for your investor call/ });
+  await expect(calendar).toBeVisible();
+  await calendar.focus();
+  await page.keyboard.press('a');
+  await expect(calendar).toHaveAccessibleName(/proposed/);
+  await page.keyboard.press('r');
+  await expect(
+    calendar.getByRole('textbox', { name: 'What should I learn from this?' }),
+  ).toBeFocused();
+  await page.keyboard.type('too early');
+  await page.keyboard.press('Enter');
+  await expect(calendar).toHaveAccessibleName(/rejected/);
+  const email = page.getByRole('article', { name: /Draft a concise agenda/ });
+  await email.focus();
+  await page.keyboard.press('e');
+  const body = email.getByRole('textbox', { name: 'body', exact: true });
+  await expect(body).toBeFocused();
+  await body.fill('');
+  await page.keyboard.type(editedEmail);
+  await expect(email).toHaveAccessibleName(/proposed/);
+  await email.getByRole('button', { name: 'Save & approve' }).click();
+  await expect(email).toHaveAccessibleName(/edited/);
+  const note = page.getByRole('article', { name: /Keep a preparation checklist/ });
+  await note.focus();
+  await page.keyboard.press('a');
+  await expect(note).toHaveAccessibleName(/approved/);
+  await page.getByRole('button', { name: 'Learn from this', exact: true }).click();
+  const notifications = page.getByRole('region', { name: 'Notifications alt+T' });
+  await expect(notifications).toHaveAttribute('aria-live', 'polite');
+  await expect(notifications).toContainText('Learned 2 new preferences.');
+  await expect(page.locator('main [role="status"]')).toContainText('3 of 3 steps reviewed');
+  await note.focus();
+  await page.keyboard.press('e');
+  await expect(note.getByRole('textbox')).toHaveCount(0);
+});

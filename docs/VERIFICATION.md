@@ -24,3 +24,13 @@
 The Chromium test runs the complete reject → edit → learn → compare → approve → execute flow at 1440×900, 1280×900, and 768×900. It fails on console errors, uncaught page errors, failed requests, HTTP errors, or horizontal document overflow. Screenshots include a dark-theme view. Screenshot inspection is performed by opening the generated PNGs, not inferred from passing assertions.
 
 Live Meta connectivity and model quality have not been verified.
+
+## Step 3
+
+- Reset demo now atomically clears application rows and restores five seed memories. The browser suite checks empty sessions, plans, results and model calls, original confidence values, and a second run returning to v1 with the blocking warning.
+- Superseded same-key memories use a dimmed surface and explicit label; stronger evidence sorts ahead of the older value. Memory order is stable across resets.
+- Empty workspace explains Remember → Plan → Ask → Act → Learn. The persistent toolbar states “Demo mode: model and tools are simulated”.
+- All three progress labels are shown during a bounded 650ms mock reading window. Complete click-to-plan time is asserted below three seconds.
+- Keyboard browser test covers blocked A, R with focused reason input, E with focused body editor, typing without firing shortcuts, A approval, and locked-session shortcuts.
+- Onboarding and drawers previously allowed focus to escape. They now trap Tab/Shift+Tab, close on Escape, make the background inert, and restore focus. Browser checks include a visible 2px focus outline, the polite notification live region, updated workspace status, and reduced-motion mode. Actual spoken screen-reader output is not verified.
+- One visible toast at a time avoids notification stacks; tablet empty-state spacing keeps the start button above reset feedback.
