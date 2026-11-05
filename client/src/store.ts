@@ -5,6 +5,7 @@ import {
   api,
   emptySchema,
   healthSchema,
+  isUnreachable,
   jsonRequest,
   memoriesSchema,
   memorySchema,
@@ -19,6 +20,17 @@ import {
 } from './api';
 
 export type View = 'Sessions' | 'Memory' | 'Calendar' | 'Notes' | 'Drafts' | 'Audit';
+// The browser can load before the API finishes starting, so give it a few seconds to answer.
+async function retryWhileUnreachable<T>(operation: () => Promise<T>): Promise<T> {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      return await operation();
+    } catch (error) {
+      if (!isUnreachable(error) || attempt >= 3) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 600 * (attempt + 1)));
+    }
+  }
+}
 export function notifyError(error: unknown, retry?: () => void): void {
   toast.error(error instanceof Error ? error.message : 'Something went wrong. Please retry.', {
     duration: 8000,
@@ -80,11 +92,13 @@ export const useWorkspace = create<Workspace>((set, get) => ({
   },
   load: async () => {
     try {
-      const [health, memories, sessions] = await Promise.all([
-        api('/health', healthSchema),
-        api('/memories?limit=200', memoriesSchema),
-        api('/sessions', z.object({ sessions: z.array(sessionSummarySchema) })),
-      ]);
+      const [health, memories, sessions] = await retryWhileUnreachable(() =>
+        Promise.all([
+          api('/health', healthSchema),
+          api('/memories?limit=200', memoriesSchema),
+          api('/sessions', z.object({ sessions: z.array(sessionSummarySchema) })),
+        ]),
+      );
       set({ health, memories: memories.memories, sessions: sessions.sessions, loading: false });
     } catch (error) {
       set({ loading: false });

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Download, ShieldCheck, Trash2, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { z } from 'zod';
-import { api, jsonRequest } from '../api';
+import { api, apiResponse, jsonRequest } from '../api';
 import { notifyError, useWorkspace } from '../store';
 
 const resetSchema = z.object({ reset: z.boolean(), deleted: z.number() });
@@ -25,7 +25,7 @@ export function DataPrivacy() {
   async function exportJson() {
     setExporting(true);
     try {
-      const response = await fetch('/api/export');
+      const response = await apiResponse('/export');
       if (!response.ok) throw new Error('The export could not be prepared. Please retry.');
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);

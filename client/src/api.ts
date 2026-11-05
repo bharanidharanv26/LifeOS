@@ -178,19 +178,57 @@ export class ApiError extends Error {
     super(message);
   }
 }
+
+/** Shown whenever the browser cannot get an answer from the local API. */
+export const unreachableMessage =
+  'Cannot reach the local API. Start it with `npm run demo`, then retry.';
+
+/** True for failures where the request never reached the API or the API returned no usable body. */
+export function isUnreachable(error: unknown): boolean {
+  return (
+    error instanceof ApiError &&
+    (error.code === 'NETWORK_ERROR' || error.code === 'API_UNAVAILABLE')
+  );
+}
+
+/** Fetch a JSON API route and translate transport failures into readable errors. */
+export async function apiResponse(path: string, options: RequestInit = {}): Promise<Response> {
+  try {
+    return await fetch(`/api${path}`, {
+      ...options,
+      headers: {
+        ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+        ...options.headers,
+      },
+    });
+  } catch {
+    // Browser network errors say only "Failed to fetch", which gives no hint about the cause.
+    throw new ApiError('NETWORK_ERROR', unreachableMessage);
+  }
+}
+
 export async function api<T>(
   path: string,
   schema: z.ZodType<T>,
   options: RequestInit = {},
 ): Promise<T> {
-  const response = await fetch(`/api${path}`, {
-    ...options,
-    headers: {
-      ...(options.body ? { 'Content-Type': 'application/json' } : {}),
-      ...options.headers,
-    },
-  });
-  const body: unknown = await response.json();
+  const response = await apiResponse(path, options);
+  let body: unknown;
+  try {
+    const raw = await response.text();
+    body = raw.trim() === '' ? undefined : JSON.parse(raw);
+  } catch {
+    body = undefined;
+  }
+  if (body === undefined) {
+    // A dev proxy with the API down answers 500 with an empty body, not JSON.
+    throw new ApiError(
+      response.ok ? 'INVALID_RESPONSE' : 'API_UNAVAILABLE',
+      response.ok
+        ? 'The API returned a response the app could not read. Please retry.'
+        : unreachableMessage,
+    );
+  }
   if (!response.ok) {
     const failure = z
       .object({ error: z.object({ code: z.string(), message: z.string() }) })
